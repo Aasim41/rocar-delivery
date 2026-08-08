@@ -19,7 +19,9 @@ function AppRoutes() {
   const [userRole, setUserRole] = useState<'buyer' | 'shop_owner' | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const [hasSeenOnboarding, setHasSeenOnboarding] = useState(false);
+  const [hasSeenOnboarding, setHasSeenOnboarding] = useState(() => {
+    return localStorage.getItem('demo_mode') === 'buyer' || localStorage.getItem('has_seen_onboarding') === 'true';
+  });
 
   useEffect(() => {
     // Initialize theme from local storage

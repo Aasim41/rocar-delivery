@@ -69,6 +69,7 @@ export function Onboarding({ onComplete }: { onComplete?: () => void }) {
 
   const handleFinish = () => {
     localStorage.setItem('demo_mode', 'buyer');
+    localStorage.setItem('has_seen_onboarding', 'true');
     localStorage.setItem('onboarding_name', name);
     localStorage.setItem('onboarding_age', age);
     localStorage.setItem('onboarding_address', address);
