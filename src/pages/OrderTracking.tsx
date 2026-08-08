@@ -62,9 +62,9 @@ export function OrderTracking() {
           const generatedPin = Math.floor(1000 + Math.random() * 9000).toString();
           
           // IMPORTANT: Replace these with your actual EmailJS keys!
-          const serviceId = 'service_w7qmwoa';
-          const templateId = 'template_8lkn1x9';
-          const publicKey = '3MGHBwZxoOMrzO-gV';
+          const serviceId: string = 'service_w7qmwoa';
+          const templateId: string = 'template_8lkn1x9';
+          const publicKey: string = '3MGHBwZxoOMrzO-gV';
 
           // Prevent crashing if keys aren't set yet during demo
           if (serviceId === 'YOUR_SERVICE_ID') {
