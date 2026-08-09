@@ -116,12 +116,12 @@ export function ParcelPickup() {
         <LocationMap 
           locations={[
             ...(pickup && pickup !== 'custom' 
-              ? [{ address: pickup, label: "Pickup" }] 
+              ? [{ address: pickup === 'Current Location (GPS)' && userLocation ? `GPS: ${userLocation.lat}, ${userLocation.lng}` : pickup, label: "Pickup" }] 
               : (pickup === 'custom' && customPickup.length > 2) 
                   ? [{ address: userLocation ? `GPS: ${userLocation.lat}, ${userLocation.lng}` : customPickup, label: "Pickup" }] 
                   : []),
             ...(dropoff && dropoff !== 'custom' 
-              ? [{ address: dropoff, label: "Destination" }] 
+              ? [{ address: dropoff === 'Current Location (GPS)' && userLocation ? `GPS: ${userLocation.lat}, ${userLocation.lng}` : dropoff, label: "Destination" }] 
               : (dropoff === 'custom' && customDropoff.length > 2) 
                   ? [{ address: userLocation ? `GPS: ${userLocation.lat}, ${userLocation.lng}` : customDropoff, label: "Destination" }] 
                   : []),
@@ -142,7 +142,7 @@ export function ParcelPickup() {
         initial={{ y: '100%' }}
         animate={{ y: 0 }}
         transition={{ type: "spring", damping: 25, stiffness: 200 }}
-        className="glass-panel p-6 shrink-0 z-20 rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.1)]"
+        className="glass-panel p-6 pb-28 shrink-0 z-20 rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.1)]"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
           
@@ -158,7 +158,7 @@ export function ParcelPickup() {
                 value={pickup}
                 onChange={async (e) => {
                   const val = e.target.value;
-                  if (val === 'gps') {
+                  if (val === 'Current Location (GPS)') {
                     try {
                       const position = await Geolocation.getCurrentPosition();
                       setUserLocation({ lat: position.coords.latitude, lng: position.coords.longitude });
@@ -180,7 +180,7 @@ export function ParcelPickup() {
                 className="block w-full pl-12 pr-4 py-4 bg-[var(--card-bg)] border border-[var(--border-color)] rounded-2xl text-[var(--text-main)] font-medium focus:outline-none focus:ring-2 focus:ring-[var(--color-sky)] transition-all appearance-none"
               >
                 <option value="" disabled>Select pickup...</option>
-                <option value="gps">📍 Use Current Location (GPS)</option>
+                <option value="Current Location (GPS)">📍 Use Current Location (GPS)</option>
                 <option value="custom">+ Type a custom address</option>
               </select>
             </div>
@@ -208,18 +208,31 @@ export function ParcelPickup() {
                 required
                 disabled={loadingLocations}
                 value={dropoff}
-                onChange={(e) => {
+                onChange={async (e) => {
                   const val = e.target.value;
-                  if (val === 'custom') {
+                  if (val === 'Current Location (GPS)') {
+                    try {
+                      const position = await Geolocation.getCurrentPosition();
+                      setUserLocation({ lat: position.coords.latitude, lng: position.coords.longitude });
+                      setDropoff('Current Location (GPS)');
+                    } catch (error) {
+                      console.error("Location error:", error);
+                      alert("Please enable GPS permissions to use this feature.");
+                      setDropoff('');
+                    }
+                  } else if (val === 'custom') {
                     Geolocation.getCurrentPosition()
                       .then(position => setUserLocation({ lat: position.coords.latitude, lng: position.coords.longitude }))
                       .catch(error => console.error("Background location error:", error));
+                    setDropoff(val);
+                  } else {
+                    setDropoff(val);
                   }
-                  setDropoff(val);
                 }}
                 className="block w-full pl-12 pr-4 py-4 bg-[var(--card-bg)] border border-[var(--border-color)] rounded-2xl text-[var(--text-main)] font-medium focus:outline-none focus:ring-2 focus:ring-[var(--color-sky)] transition-all appearance-none disabled:opacity-50"
               >
                 <option value="" disabled>{loadingLocations ? 'Loading addresses...' : 'Select destination...'}</option>
+                <option value="Current Location (GPS)">📍 Use Current Location (GPS)</option>
                 {savedLocations.map((loc, idx) => (
                   <option key={idx} value={loc.name}>⭐ {loc.name}</option>
                 ))}

@@ -161,7 +161,12 @@ export function Marketplace() {
     if (session && session.user.id !== 'demo-user-123') {
       const firstItemId = Object.keys(cart)[0];
       const firstItem = catalog.find(i => i.id === firstItemId);
-      const shopId = firstItem?.shop_id;
+      let shopId = firstItem?.shop_id;
+
+      if (!shopId) {
+        const { data: fallbackShop } = await supabase.from('shops').select('id').limit(1).single();
+        shopId = fallbackShop?.id;
+      }
 
       const orderData = {
         user_id: session.user.id,
@@ -338,7 +343,9 @@ export function Marketplace() {
                       { 
                         address: deliveryAddress === 'custom' && userLocation 
                           ? `GPS: ${userLocation.lat}, ${userLocation.lng}` 
-                          : (deliveryAddress === 'custom' ? customAddress : deliveryAddress), 
+                          : (deliveryAddress === 'Current Location (GPS)' && userLocation) 
+                              ? `GPS: ${userLocation.lat}, ${userLocation.lng}`
+                              : (deliveryAddress === 'custom' ? customAddress : deliveryAddress), 
                         label: "Drop-off Location" 
                       }
                     ]} 
