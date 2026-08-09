@@ -55,6 +55,14 @@ export function OrderTracking() {
       emailSentRef.current = true;
       setShowNotification(true);
       
+      // Auto-trigger Database Webhook for Native Push Notification
+      if (id) {
+        supabase.from('orders').update({ status: 'arrived' }).eq('id', id).then(({error}) => {
+          if (error) console.error("Failed to automatically update order to arrived:", error);
+          else console.log("Order automatically updated to 'arrived' in DB via GPS simulation!");
+        });
+      }
+      
       const triggerEmail = async () => {
         try {
           const { data: { session } } = await supabase.auth.getSession();
