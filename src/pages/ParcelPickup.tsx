@@ -20,7 +20,7 @@ export function ParcelPickup() {
   
   const navigate = useNavigate();
 
-  const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
+  // userLocation state removed because it is unused
 
   useEffect(() => {
     fetchSavedLocations();
@@ -152,8 +152,7 @@ export function ParcelPickup() {
                   const val = e.target.value;
                   if (val === 'gps') {
                     try {
-                      const position = await Geolocation.getCurrentPosition();
-                      setUserLocation({ lat: position.coords.latitude, lng: position.coords.longitude });
+                      await Geolocation.getCurrentPosition();
                       setPickup('Current Location (GPS)');
                     } catch (error) {
                       console.error("Location error:", error);

@@ -75,6 +75,7 @@ export function Marketplace() {
 
   useEffect(() => {
     fetchCatalog();
+    fetchSavedLocations();
 
     // Subscribe to realtime updates on the items table
     const channel = supabase

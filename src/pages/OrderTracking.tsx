@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
-import { CheckCircle2, Clock, ArrowLeft, Lock, Unlock, Loader2, Bell, Truck, Package, MapPin, Navigation2, Check } from 'lucide-react';
+import { Clock, ArrowLeft, Lock, Unlock, Loader2, Bell, Truck, Package, MapPin, Navigation2, Check } from 'lucide-react';
 import { LiveMap } from '../components/LiveMap';
 import { motion, AnimatePresence } from 'framer-motion';
 import emailjs from '@emailjs/browser';
