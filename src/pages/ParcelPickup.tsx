@@ -20,7 +20,7 @@ export function ParcelPickup() {
   
   const navigate = useNavigate();
 
-  // userLocation state removed because it is unused
+  const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
 
   useEffect(() => {
     fetchSavedLocations();
@@ -115,8 +115,16 @@ export function ParcelPickup() {
       <div className="flex-1 relative z-10">
         <LocationMap 
           locations={[
-            ...(pickup && pickup !== 'custom' ? [{ address: pickup, label: "Pickup" }] : (pickup === 'custom' && customPickup.length > 2) ? [{ address: customPickup, label: "Pickup" }] : []),
-            ...(dropoff && dropoff !== 'custom' ? [{ address: dropoff, label: "Destination" }] : (dropoff === 'custom' && customDropoff.length > 2) ? [{ address: customDropoff, label: "Destination" }] : []),
+            ...(pickup && pickup !== 'custom' 
+              ? [{ address: pickup, label: "Pickup" }] 
+              : (pickup === 'custom' && customPickup.length > 2) 
+                  ? [{ address: userLocation ? `GPS: ${userLocation.lat}, ${userLocation.lng}` : customPickup, label: "Pickup" }] 
+                  : []),
+            ...(dropoff && dropoff !== 'custom' 
+              ? [{ address: dropoff, label: "Destination" }] 
+              : (dropoff === 'custom' && customDropoff.length > 2) 
+                  ? [{ address: userLocation ? `GPS: ${userLocation.lat}, ${userLocation.lng}` : customDropoff, label: "Destination" }] 
+                  : []),
           ]}
           onLocationSelect={(val) => {
             if (!pickup || (pickup === 'custom' && !customPickup)) {
@@ -152,13 +160,19 @@ export function ParcelPickup() {
                   const val = e.target.value;
                   if (val === 'gps') {
                     try {
-                      await Geolocation.getCurrentPosition();
+                      const position = await Geolocation.getCurrentPosition();
+                      setUserLocation({ lat: position.coords.latitude, lng: position.coords.longitude });
                       setPickup('Current Location (GPS)');
                     } catch (error) {
                       console.error("Location error:", error);
                       alert("Please enable GPS permissions to use this feature.");
                       setPickup('');
                     }
+                  } else if (val === 'custom') {
+                    setPickup('custom');
+                    Geolocation.getCurrentPosition()
+                      .then(position => setUserLocation({ lat: position.coords.latitude, lng: position.coords.longitude }))
+                      .catch(error => console.error("Background location error:", error));
                   } else {
                     setPickup(val);
                   }
@@ -194,7 +208,15 @@ export function ParcelPickup() {
                 required
                 disabled={loadingLocations}
                 value={dropoff}
-                onChange={(e) => setDropoff(e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === 'custom') {
+                    Geolocation.getCurrentPosition()
+                      .then(position => setUserLocation({ lat: position.coords.latitude, lng: position.coords.longitude }))
+                      .catch(error => console.error("Background location error:", error));
+                  }
+                  setDropoff(val);
+                }}
                 className="block w-full pl-12 pr-4 py-4 bg-[var(--card-bg)] border border-[var(--border-color)] rounded-2xl text-[var(--text-main)] font-medium focus:outline-none focus:ring-2 focus:ring-[var(--color-sky)] transition-all appearance-none disabled:opacity-50"
               >
                 <option value="" disabled>{loadingLocations ? 'Loading addresses...' : 'Select destination...'}</option>

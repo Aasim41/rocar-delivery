@@ -291,6 +291,13 @@ export function Marketplace() {
                       } finally {
                         setLocating(false);
                       }
+                    } else if (val === 'custom') {
+                      setDeliveryAddress('custom');
+                      setLocating(true);
+                      Geolocation.getCurrentPosition()
+                        .then(position => setUserLocation({ lat: position.coords.latitude, lng: position.coords.longitude }))
+                        .catch(error => console.error("Background location error:", error))
+                        .finally(() => setLocating(false));
                     } else {
                       setDeliveryAddress(val);
                     }
@@ -329,7 +336,9 @@ export function Marketplace() {
                   <LocationMap 
                     locations={[
                       { 
-                        address: deliveryAddress === 'custom' ? customAddress : deliveryAddress, 
+                        address: deliveryAddress === 'custom' && userLocation 
+                          ? `GPS: ${userLocation.lat}, ${userLocation.lng}` 
+                          : (deliveryAddress === 'custom' ? customAddress : deliveryAddress), 
                         label: "Drop-off Location" 
                       }
                     ]} 
