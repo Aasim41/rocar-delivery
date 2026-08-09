@@ -28,7 +28,6 @@ const slides = [
     color: 'text-[var(--color-purple)]',
     bg: 'bg-[var(--color-purple)]/10 border border-[var(--color-purple)]/20',
   },
-  },
 ];
 
 export function Onboarding({ onComplete }: { onComplete?: () => void }) {
