@@ -4,6 +4,7 @@ import { Package, ShoppingBag, Map, Bell, User, Moon, Sun, LocateFixed } from 'l
 import { motion, AnimatePresence } from 'framer-motion';
 import { WaveInput } from '../components/WaveInput';
 import { LocationMap } from '../components/LocationMap';
+import { Geolocation } from '@capacitor/geolocation';
 
 const slides = [
   {
@@ -177,17 +178,13 @@ export function Onboarding({ onComplete }: { onComplete?: () => void }) {
                   />
                   <button 
                     type="button"
-                    onClick={() => {
-                      if ("geolocation" in navigator) {
-                        navigator.geolocation.getCurrentPosition(
-                          (position) => {
-                            setAddress(`${position.coords.latitude}, ${position.coords.longitude}`);
-                          },
-                          (error) => {
-                            console.error(error);
-                            alert("Please enable GPS permissions to use this feature.");
-                          }
-                        );
+                    onClick={async () => {
+                      try {
+                        const position = await Geolocation.getCurrentPosition();
+                        setAddress(`${position.coords.latitude}, ${position.coords.longitude}`);
+                      } catch (error) {
+                        console.error(error);
+                        alert("Please enable GPS permissions to use this feature.");
                       }
                     }}
                     className="absolute right-0 top-6 text-[var(--color-sky)] p-2 hover:bg-[var(--color-sky)]/10 rounded-full transition-colors"

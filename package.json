@@ -12,6 +12,7 @@
   "dependencies": {
     "@capacitor/android": "^8.5.0",
     "@capacitor/core": "^8.5.0",
+    "@capacitor/geolocation": "^8.2.1",
     "@capacitor/push-notifications": "^8.1.2",
     "@emailjs/browser": "^4.4.1",
     "@supabase/supabase-js": "^2.112.2",

@@ -5,6 +5,7 @@ import { LocationMap } from '../components/LocationMap';
 import { motion } from 'framer-motion';
 import { supabase } from '../lib/supabase';
 import { WaveInput } from '../components/WaveInput';
+import { Geolocation } from '@capacitor/geolocation';
 
 export function ParcelPickup() {
   const [pickup, setPickup] = useState('');
@@ -147,21 +148,17 @@ export function ParcelPickup() {
               <select
                 required
                 value={pickup}
-                onChange={(e) => {
+                onChange={async (e) => {
                   const val = e.target.value;
                   if (val === 'gps') {
-                    if ("geolocation" in navigator) {
-                      navigator.geolocation.getCurrentPosition(
-                        (position) => {
-                          setUserLocation({ lat: position.coords.latitude, lng: position.coords.longitude });
-                          setPickup('Current Location (GPS)');
-                        },
-                        (error) => {
-                          console.error("Location error:", error);
-                          alert("Please enable GPS permissions to use this feature.");
-                          setPickup('');
-                        }
-                      );
+                    try {
+                      const position = await Geolocation.getCurrentPosition();
+                      setUserLocation({ lat: position.coords.latitude, lng: position.coords.longitude });
+                      setPickup('Current Location (GPS)');
+                    } catch (error) {
+                      console.error("Location error:", error);
+                      alert("Please enable GPS permissions to use this feature.");
+                      setPickup('');
                     }
                   } else {
                     setPickup(val);

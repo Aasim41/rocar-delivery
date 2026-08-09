@@ -6,6 +6,7 @@ import { LocationMap } from '../components/LocationMap';
 import { WaveInput } from '../components/WaveInput';
 
 import { supabase } from '../lib/supabase';
+import { Geolocation } from '@capacitor/geolocation';
 
 const MAX_PAYLOAD_GRAMS = 2000;
 
@@ -274,24 +275,20 @@ export function Marketplace() {
                   required
                   disabled={loadingLocations}
                   value={deliveryAddress}
-                  onChange={(e) => {
+                  onChange={async (e) => {
                     const val = e.target.value;
                     if (val === 'gps') {
-                      if ("geolocation" in navigator) {
-                        setLocating(true);
-                        navigator.geolocation.getCurrentPosition(
-                          (position) => {
-                            setUserLocation({ lat: position.coords.latitude, lng: position.coords.longitude });
-                            setDeliveryAddress('Current Location (GPS)');
-                            setLocating(false);
-                          },
-                          (error) => {
-                            console.error("Location error:", error);
-                            alert("Please enable GPS permissions to use this feature.");
-                            setDeliveryAddress('');
-                            setLocating(false);
-                          }
-                        );
+                      setLocating(true);
+                      try {
+                        const position = await Geolocation.getCurrentPosition();
+                        setUserLocation({ lat: position.coords.latitude, lng: position.coords.longitude });
+                        setDeliveryAddress('Current Location (GPS)');
+                      } catch (error) {
+                        console.error("Location error:", error);
+                        alert("Please enable GPS permissions to use this feature.");
+                        setDeliveryAddress('');
+                      } finally {
+                        setLocating(false);
                       }
                     } else {
                       setDeliveryAddress(val);
