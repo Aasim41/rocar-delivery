@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "204865874917",
+    "project_id": "robot-delivery-d43ae",
+    "storage_bucket": "robot-delivery-d43ae.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:204865874917:android:788984e142c7d3fced5d0c",
+        "android_client_info": {
+          "package_name": "com.delivery.robot"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyARZeuXJkm2HbVTBlVcMfjyCy0te2jKtWw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

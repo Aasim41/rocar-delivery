@@ -12,6 +12,7 @@
   "dependencies": {
     "@capacitor/android": "^8.5.0",
     "@capacitor/core": "^8.5.0",
+    "@capacitor/push-notifications": "^8.1.2",
     "@emailjs/browser": "^4.4.1",
     "@supabase/supabase-js": "^2.112.2",
     "@tailwindcss/postcss": "^4.3.3",

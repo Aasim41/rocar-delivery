@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MapPin, Navigation as NavIcon, ArrowLeft } from 'lucide-react';
+import { MapPin, Navigation as NavIcon, ArrowLeft, Route } from 'lucide-react';
 import { LocationMap } from '../components/LocationMap';
 import { motion } from 'framer-motion';
 import { supabase } from '../lib/supabase';
@@ -23,14 +23,6 @@ export function ParcelPickup() {
 
   useEffect(() => {
     fetchSavedLocations();
-    if ("geolocation" in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setUserLocation({ lat: position.coords.latitude, lng: position.coords.longitude });
-        },
-        (error) => console.error("Location error:", error)
-      );
-    }
   }, []);
 
   const fetchSavedLocations = async () => {
@@ -155,11 +147,30 @@ export function ParcelPickup() {
               <select
                 required
                 value={pickup}
-                onChange={(e) => setPickup(e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === 'gps') {
+                    if ("geolocation" in navigator) {
+                      navigator.geolocation.getCurrentPosition(
+                        (position) => {
+                          setUserLocation({ lat: position.coords.latitude, lng: position.coords.longitude });
+                          setPickup('Current Location (GPS)');
+                        },
+                        (error) => {
+                          console.error("Location error:", error);
+                          alert("Please enable GPS permissions to use this feature.");
+                          setPickup('');
+                        }
+                      );
+                    }
+                  } else {
+                    setPickup(val);
+                  }
+                }}
                 className="block w-full pl-12 pr-4 py-4 bg-[var(--card-bg)] border border-[var(--border-color)] rounded-2xl text-[var(--text-main)] font-medium focus:outline-none focus:ring-2 focus:ring-[var(--color-sky)] transition-all appearance-none"
               >
                 <option value="" disabled>Select pickup...</option>
-                {userLocation && <option value="Current Location (GPS)">📍 My Current Location (GPS)</option>}
+                <option value="gps">📍 Use Current Location (GPS)</option>
                 <option value="custom">+ Type a custom address</option>
               </select>
             </div>
@@ -229,9 +240,10 @@ export function ParcelPickup() {
 
           <button 
             type="submit"
-            className="w-full minimal-button bg-[var(--color-sky)] text-white py-4 mt-4 text-lg shadow-md"
+            className="w-full minimal-button bg-[var(--color-sky)] text-white py-4 mt-4 text-lg shadow-md flex justify-center items-center space-x-2"
           >
-            Confirm Route
+            <span>Confirm Route</span>
+            <Route className="w-5 h-5" />
           </button>
         </form>
       </motion.div>

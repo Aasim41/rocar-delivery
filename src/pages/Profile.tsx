@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { User, MapPin, Package, LogOut, Loader2, Edit2, Check, Clock, Moon, Sun } from 'lucide-react';
+import { User, MapPin, Package, LogOut, Loader2, Edit2, Check, Clock, Moon, Sun, Settings, Trash2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 
@@ -12,8 +12,13 @@ export function Profile() {
   const [isDarkMode, setIsDarkMode] = useState(false);
   
   // Editing state
-  const [isEditingName, setIsEditingName] = useState(false);
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [editName, setEditName] = useState('');
+  const [editAge, setEditAge] = useState('');
+  
+  // Address editing
+  const [editingAddressIdx, setEditingAddressIdx] = useState<number | null>(null);
+  const [editAddressName, setEditAddressName] = useState('');
 
   const navigate = useNavigate();
 
@@ -46,6 +51,7 @@ export function Profile() {
       if (profileRes.data) {
         setProfile(profileRes.data);
         setEditName(profileRes.data.name || '');
+        setEditAge(profileRes.data.age || '');
       }
       if (ordersRes.data) setOrders(ordersRes.data);
     }
@@ -56,14 +62,29 @@ export function Profile() {
     await supabase.auth.signOut();
   };
 
-  const saveName = async () => {
+  const saveProfile = async () => {
     if (!session) return;
-    setIsEditingName(false);
+    setIsEditingProfile(false);
     
-    // Optimistic update
-    setProfile((prev: any) => ({ ...prev, name: editName }));
-    
-    await supabase.from('users').update({ name: editName }).eq('id', session.user.id);
+    setProfile((prev: any) => ({ ...prev, name: editName, age: editAge }));
+    await supabase.from('users').update({ name: editName, age: editAge }).eq('id', session.user.id);
+  };
+
+  const deleteAddress = async (idx: number) => {
+    if (!session || !profile?.saved_locations) return;
+    const newLocations = [...profile.saved_locations];
+    newLocations.splice(idx, 1);
+    setProfile((prev: any) => ({ ...prev, saved_locations: newLocations }));
+    await supabase.from('users').update({ saved_locations: newLocations }).eq('id', session.user.id);
+  };
+
+  const saveAddress = async (idx: number) => {
+    if (!session || !profile?.saved_locations) return;
+    const newLocations = [...profile.saved_locations];
+    newLocations[idx].name = editAddressName;
+    setProfile((prev: any) => ({ ...prev, saved_locations: newLocations }));
+    setEditingAddressIdx(null);
+    await supabase.from('users').update({ saved_locations: newLocations }).eq('id', session.user.id);
   };
 
   const toggleTheme = () => {
@@ -96,51 +117,57 @@ export function Profile() {
     >
       <div className="absolute top-[-10%] right-[-10%] w-64 h-64 bg-[var(--color-sky)] rounded-full opacity-10 blur-[80px] pointer-events-none z-0" />
 
-      <header className="mb-8 mt-6 flex justify-between items-center relative z-10">
+      <header className="mb-8 mt-6 relative z-10">
         <h1 className="text-3xl font-extrabold text-[var(--text-main)] tracking-tight">Profile</h1>
-        <button 
-          onClick={toggleTheme}
-          className="w-12 h-12 glass-panel flex items-center justify-center rounded-full text-[var(--text-main)] hover:scale-105 transition-transform shadow-lg"
-        >
-          {isDarkMode ? <Sun className="w-5 h-5 font-semibold text-[var(--color-yellow)]" /> : <Moon className="w-5 h-5 font-semibold text-[var(--color-sky)]" />}
-        </button>
       </header>
 
       {/* User Card */}
       <div className="glass-card p-6 mb-8 relative z-10">
-        <div className="flex items-center space-x-4">
+        <div className="flex items-start space-x-4">
           <div className="w-16 h-16 bg-[var(--color-sky)]/10 border border-[var(--color-sky)]/20 rounded-full flex items-center justify-center shrink-0">
             <User className="w-8 h-8 text-[var(--color-sky)]" />
           </div>
-          <div className="flex-1 min-w-0">
-            {isEditingName ? (
-              <div className="flex items-center space-x-2 mb-1">
+          <div className="flex-1 min-w-0 pt-1">
+            {isEditingProfile ? (
+              <div className="space-y-3">
                 <input 
                   type="text" 
                   autoFocus
                   value={editName}
                   onChange={(e) => setEditName(e.target.value)}
-                  className="w-full bg-[var(--bg-page)]/50 border border-[var(--border-color)] px-3 py-1 rounded-lg text-[var(--text-main)] font-semibold focus:outline-none focus:border-[var(--color-sky)]"
+                  className="w-full bg-[var(--bg-page)]/50 border border-[var(--border-color)] px-3 py-2 rounded-lg text-[var(--text-main)] font-semibold focus:outline-none focus:border-[var(--color-sky)]"
                   placeholder="Your Name"
                 />
-                <button onClick={saveName} className="p-2 bg-[var(--color-green)] rounded-lg text-white hover:opacity-90 transition-opacity">
-                  <Check className="w-4 h-4 font-bold" />
+                <input 
+                  type="number" 
+                  value={editAge}
+                  onChange={(e) => setEditAge(e.target.value)}
+                  className="w-full bg-[var(--bg-page)]/50 border border-[var(--border-color)] px-3 py-2 rounded-lg text-[var(--text-main)] font-semibold focus:outline-none focus:border-[var(--color-sky)]"
+                  placeholder="Your Age"
+                />
+                <button onClick={saveProfile} className="w-full p-2 flex justify-center items-center space-x-2 bg-[var(--color-green)] rounded-lg text-white font-bold hover:opacity-90 transition-opacity">
+                  <Check className="w-4 h-4" />
+                  <span>Save Profile</span>
                 </button>
               </div>
             ) : (
-              <div className="flex items-center space-x-2 mb-1 group">
-                <h2 className="text-xl font-bold text-[var(--text-main)] truncate">
-                  {profile?.name || 'Set Name'}
-                </h2>
-                <button onClick={() => setIsEditingName(true)} className="p-1.5 rounded-md text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--bg-page)] transition-colors">
-                  <Edit2 className="w-4 h-4" />
-                </button>
+              <div className="group">
+                <div className="flex justify-between items-start mb-1">
+                  <div>
+                    <h2 className="text-xl font-bold text-[var(--text-main)] truncate">
+                      {profile?.name || 'Set Name'}
+                    </h2>
+                    <p className="text-[var(--text-muted)] font-medium truncate text-sm">
+                      {session?.user?.email || 'No email'} 
+                    </p>
+                    {profile?.age && <p className="text-[var(--text-muted)] font-medium text-sm mt-1">Age {profile.age}</p>}
+                  </div>
+                  <button onClick={() => setIsEditingProfile(true)} className="p-1.5 rounded-md text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--bg-page)] transition-colors">
+                    <Edit2 className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             )}
-            <p className="text-[var(--text-muted)] font-medium truncate text-sm">
-              {session?.user?.email || 'No email'} 
-              {profile?.age ? ` • Age ${profile.age}` : ''}
-            </p>
           </div>
         </div>
       </div>
@@ -151,14 +178,41 @@ export function Profile() {
         <div className="space-y-3">
           {profile?.saved_locations?.length > 0 && Array.isArray(profile.saved_locations) ? (
             profile.saved_locations.map((loc: any, idx: number) => (
-              <div key={idx} className="glass-card flex items-center space-x-4 p-4 hover:border-[var(--color-sky)]/50 transition-colors cursor-pointer">
-                <div className="w-10 h-10 bg-[var(--color-sky)]/10 rounded-full flex items-center justify-center shrink-0">
+              <div key={idx} className="glass-card flex items-center p-4 hover:border-[var(--color-sky)]/50 transition-colors">
+                <div className="w-10 h-10 bg-[var(--color-sky)]/10 rounded-full flex items-center justify-center shrink-0 mr-4">
                   <MapPin className="w-5 h-5 text-[var(--color-sky)]" />
                 </div>
-                <div>
-                  <p className="font-semibold text-[var(--text-main)]">{loc.name || 'Saved Location'}</p>
-                  <p className="text-xs font-medium text-[var(--text-muted)] mt-0.5">Campus Area</p>
+                <div className="flex-1 min-w-0">
+                  {editingAddressIdx === idx ? (
+                    <div className="flex items-center space-x-2">
+                      <input 
+                        type="text" 
+                        autoFocus
+                        value={editAddressName}
+                        onChange={(e) => setEditAddressName(e.target.value)}
+                        className="w-full bg-[var(--bg-page)]/50 border border-[var(--border-color)] px-2 py-1 rounded text-[var(--text-main)] font-semibold focus:outline-none focus:border-[var(--color-sky)]"
+                      />
+                      <button onClick={() => saveAddress(idx)} className="p-1.5 bg-[var(--color-green)] rounded text-white hover:opacity-90 transition-opacity">
+                        <Check className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <p className="font-semibold text-[var(--text-main)] truncate">{loc.name || 'Saved Location'}</p>
+                      <p className="text-xs font-medium text-[var(--text-muted)] mt-0.5 truncate">Custom Address</p>
+                    </>
+                  )}
                 </div>
+                {editingAddressIdx !== idx && (
+                  <div className="flex items-center space-x-1 ml-2">
+                    <button onClick={() => { setEditingAddressIdx(idx); setEditAddressName(loc.name); }} className="p-2 rounded-md text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--bg-page)] transition-colors">
+                      <Edit2 className="w-4 h-4" />
+                    </button>
+                    <button onClick={() => deleteAddress(idx)} className="p-2 rounded-md text-[var(--color-red)] opacity-70 hover:opacity-100 hover:bg-[var(--color-red)]/10 transition-colors">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
               </div>
             ))
           ) : (
@@ -207,6 +261,36 @@ export function Profile() {
               <p className="text-sm font-medium text-[var(--text-muted)]">No past orders.</p>
             </div>
           )}
+        </div>
+      </div>
+
+      {/* Settings */}
+      <div className="mb-8 relative z-10">
+        <h3 className="text-lg font-bold text-[var(--text-main)] mb-4 px-1 flex items-center space-x-2">
+          <Settings className="w-5 h-5 text-[var(--text-muted)]" />
+          <span>Settings</span>
+        </h3>
+        <div className="glass-card p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="bg-[var(--color-sky)]/10 p-2 rounded-xl">
+                {isDarkMode ? <Moon className="w-5 h-5 text-[var(--color-sky)]" /> : <Sun className="w-5 h-5 text-[var(--color-yellow)]" />}
+              </div>
+              <div>
+                <p className="font-semibold text-[var(--text-main)]">Dark Mode</p>
+                <p className="text-xs text-[var(--text-muted)] font-medium">Toggle app theme</p>
+              </div>
+            </div>
+            <button 
+              onClick={toggleTheme}
+              className={`w-12 h-6 rounded-full transition-colors flex items-center px-1 ${isDarkMode ? 'bg-[var(--color-sky)]' : 'bg-[var(--border-color)]'}`}
+            >
+              <motion.div 
+                animate={{ x: isDarkMode ? 24 : 0 }}
+                className="w-4 h-4 rounded-full bg-white shadow-sm"
+              />
+            </button>
+          </div>
         </div>
       </div>
 

@@ -10,9 +10,9 @@ export function Navigation() {
   ];
 
   return (
-    <div className="fixed bottom-6 left-0 right-0 z-50 px-6 pointer-events-none">
+    <div className="fixed bottom-2 left-0 right-0 z-50 px-4 pointer-events-none pb-safe">
       <div className="max-w-xs mx-auto pointer-events-auto flex justify-center">
-        <nav className="nav-menu">
+        <nav className="nav-menu w-full">
           {navItems.map((item) => (
             <NavLink
               key={item.to}

@@ -100,32 +100,7 @@ export function Marketplace() {
     setLoading(false);
   };
 
-  // Try to locate user when checkout form opens
-  useEffect(() => {
-    if (showCheckoutForm) {
-      if (!userLocation) {
-        setLocating(true);
-        if ("geolocation" in navigator) {
-          navigator.geolocation.getCurrentPosition(
-            (position) => {
-              setUserLocation({ lat: position.coords.latitude, lng: position.coords.longitude });
-              setLocating(false);
-            },
-            () => {
-              setLocating(false);
-            }
-          );
-        } else {
-          setLocating(false);
-        }
-      }
-      
-      // Fetch locations if not already loaded
-      if (loadingLocations) {
-        fetchSavedLocations();
-      }
-    }
-  }, [showCheckoutForm, userLocation, loadingLocations]);
+
 
   const fetchSavedLocations = async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -299,10 +274,33 @@ export function Marketplace() {
                   required
                   disabled={loadingLocations}
                   value={deliveryAddress}
-                  onChange={(e) => setDeliveryAddress(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === 'gps') {
+                      if ("geolocation" in navigator) {
+                        setLocating(true);
+                        navigator.geolocation.getCurrentPosition(
+                          (position) => {
+                            setUserLocation({ lat: position.coords.latitude, lng: position.coords.longitude });
+                            setDeliveryAddress('Current Location (GPS)');
+                            setLocating(false);
+                          },
+                          (error) => {
+                            console.error("Location error:", error);
+                            alert("Please enable GPS permissions to use this feature.");
+                            setDeliveryAddress('');
+                            setLocating(false);
+                          }
+                        );
+                      }
+                    } else {
+                      setDeliveryAddress(val);
+                    }
+                  }}
                   className="block w-full pl-12 pr-4 py-4 bg-[var(--bg-page)]/50 border border-[var(--border-color)] rounded-2xl text-[var(--text-main)] font-medium focus:outline-none focus:ring-2 focus:ring-[var(--color-sky)] transition-all appearance-none disabled:opacity-50"
                 >
                   <option value="" disabled>{loadingLocations ? 'Loading addresses...' : 'Select drop-off location...'}</option>
+                  <option value="gps">📍 Use Current Location (GPS)</option>
                   {savedLocations.map((loc, idx) => (
                     <option key={idx} value={loc.name}>⭐ {loc.name}</option>
                   ))}

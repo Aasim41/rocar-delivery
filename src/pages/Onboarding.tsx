@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Package, ShoppingBag, Map, Bell, User, Moon, Sun } from 'lucide-react';
+import { Package, ShoppingBag, Map, Bell, User, Moon, Sun, LocateFixed } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { WaveInput } from '../components/WaveInput';
 import { LocationMap } from '../components/LocationMap';
@@ -27,12 +27,6 @@ const slides = [
     color: 'text-[var(--color-purple)]',
     bg: 'bg-[var(--color-purple)]/10 border border-[var(--color-purple)]/20',
   },
-  {
-    icon: Bell,
-    title: 'No app needed for shopkeepers',
-    description: 'They get notified automatically via WhatsApp.',
-    color: 'text-[var(--color-yellow)]',
-    bg: 'bg-[var(--color-yellow)]/10 border border-[var(--color-yellow)]/20',
   },
 ];
 
@@ -174,13 +168,33 @@ export function Onboarding({ onComplete }: { onComplete?: () => void }) {
                   />
                 </div>
 
-                <div className="pt-2">
+                <div className="pt-2 relative">
                   <WaveInput
                     type="text"
                     label="Location (e.g. Dorm)"
                     value={address}
                     onChange={(e) => setAddress(e.target.value)}
                   />
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      if ("geolocation" in navigator) {
+                        navigator.geolocation.getCurrentPosition(
+                          (position) => {
+                            setAddress(`${position.coords.latitude}, ${position.coords.longitude}`);
+                          },
+                          (error) => {
+                            console.error(error);
+                            alert("Please enable GPS permissions to use this feature.");
+                          }
+                        );
+                      }
+                    }}
+                    className="absolute right-0 top-6 text-[var(--color-sky)] p-2 hover:bg-[var(--color-sky)]/10 rounded-full transition-colors"
+                    title="Use GPS"
+                  >
+                    <LocateFixed className="w-5 h-5" />
+                  </button>
                 </div>
 
                 <AnimatePresence>

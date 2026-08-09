@@ -11,6 +11,7 @@ import { ShopPortal } from './pages/ShopPortal';
 import { Profile } from './pages/Profile';
 import { Navigation } from './components/Navigation';
 import { supabase } from './lib/supabase';
+import { registerPushNotifications, initPushNotificationListeners } from './lib/pushNotifications';
 import { Loader2 } from 'lucide-react';
 
 function AppRoutes() {
@@ -33,8 +34,14 @@ function AppRoutes() {
 
     supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
       setSession(currentSession);
-      if (currentSession) fetchUserProfile(currentSession.user.id, currentSession);
-      else setLoading(false);
+      if (currentSession) {
+        fetchUserProfile(currentSession.user.id, currentSession);
+        // Initialize Push Notifications once logged in
+        initPushNotificationListeners();
+        registerPushNotifications();
+      } else {
+        setLoading(false);
+      }
     });
 
     const {
@@ -43,6 +50,8 @@ function AppRoutes() {
       setSession(currentSession);
       if (currentSession) {
         fetchUserProfile(currentSession.user.id, currentSession);
+        initPushNotificationListeners();
+        registerPushNotifications();
       } else {
         setUserRole(null);
         setLoading(false);

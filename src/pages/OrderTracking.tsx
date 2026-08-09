@@ -1,17 +1,17 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
-import { CheckCircle2, Clock, ArrowLeft, Lock, Unlock, Loader2, Bell } from 'lucide-react';
+import { CheckCircle2, Clock, ArrowLeft, Lock, Unlock, Loader2, Bell, Truck, Package, MapPin, Navigation2, Check } from 'lucide-react';
 import { LiveMap } from '../components/LiveMap';
 import { motion, AnimatePresence } from 'framer-motion';
 import emailjs from '@emailjs/browser';
 import { supabase } from '../lib/supabase';
 
 const STATUS_STEPS = [
-  { id: 'dispatched', label: 'Dispatched', desc: 'Robot is on the way to pickup' },
-  { id: 'at_pickup', label: 'At Pickup', desc: 'Waiting for items to be loaded' },
-  { id: 'picked_up', label: 'Picked Up', desc: 'Items loaded successfully' },
-  { id: 'en_route', label: 'En Route', desc: 'Robot is navigating to you' },
-  { id: 'arrived', label: 'Arrived', desc: 'Robot has arrived at your location' },
+  { id: 'dispatched', label: 'Dispatched', desc: 'Robot is on the way to pickup', icon: Truck },
+  { id: 'at_pickup', label: 'At Pickup', desc: 'Waiting for items to be loaded', icon: Package },
+  { id: 'picked_up', label: 'Picked Up', desc: 'Items loaded successfully', icon: Check },
+  { id: 'en_route', label: 'En Route', desc: 'Robot is navigating to you', icon: Navigation2 },
+  { id: 'arrived', label: 'Arrived', desc: 'Robot has arrived at your location', icon: MapPin },
 ];
 
 export function OrderTracking() {
@@ -60,6 +60,12 @@ export function OrderTracking() {
           const { data: { session } } = await supabase.auth.getSession();
           const userEmail = session?.user?.email || localStorage.getItem('onboarding_email') || 'test@example.com';
           const generatedPin = Math.floor(1000 + Math.random() * 9000).toString();
+          
+          // NOTE: Push Notifications via Firebase Cloud Messaging (FCM)
+          // In a production environment, you would have a Supabase Edge Function 
+          // that listens for changes to the 'orders' table. When an order status 
+          // changes to 'arrived', the Edge Function will securely query the user's 
+          // 'push_token' and trigger an FCM push notification directly to their phone.
           
           // IMPORTANT: Replace these with your actual EmailJS keys!
           const serviceId: string = 'service_w7qmwoa';
@@ -271,7 +277,7 @@ export function OrderTracking() {
                   <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 border-[var(--border-color)] relative z-10 transition-colors ${
                     isCompleted ? 'bg-[var(--color-green)] border-[var(--color-green)]' : 'bg-[var(--card-bg)]'
                   }`}>
-                    {isCompleted && <CheckCircle2 className="w-4 h-4 text-white font-bold" />}
+                    {isCompleted ? <step.icon className="w-4 h-4 text-white font-bold" /> : <div className="w-2 h-2 rounded-full bg-[var(--text-muted)] opacity-30" />}
                   </div>
                 </div>
                 
