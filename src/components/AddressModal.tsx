@@ -57,7 +57,16 @@ export function AddressModal({ isOpen, onClose, onSelect, title = "Select Addres
   const handleAddNew = async () => {
     setIsLocating(true);
     try {
-      const position = await Geolocation.getCurrentPosition();
+      // Check/request permissions first
+      const permissions = await Geolocation.checkPermissions();
+      if (permissions.location !== 'granted') {
+        await Geolocation.requestPermissions();
+      }
+      
+      const position = await Geolocation.getCurrentPosition({
+        enableHighAccuracy: true,
+        timeout: 10000
+      });
       setNewLat(position.coords.latitude);
       setNewLng(position.coords.longitude);
     } catch (error) {
@@ -182,7 +191,7 @@ export function AddressModal({ isOpen, onClose, onSelect, title = "Select Addres
                     />
                   </div>
                   
-                  <div className="flex-1 min-h-[300px] relative rounded-2xl overflow-hidden border border-[var(--border-color)] shadow-inner z-10">
+                  <div className="w-full h-[300px] shrink-0 relative rounded-2xl overflow-hidden border border-[var(--border-color)] shadow-inner z-10">
                     {newLat !== null && newLng !== null ? (
                       <>
                         <div className="absolute top-4 left-4 z-[999] bg-white/90 dark:bg-black/90 backdrop-blur-md px-3 py-1.5 rounded-lg text-xs font-semibold shadow-sm border border-[var(--border-color)] flex items-center pointer-events-none">
