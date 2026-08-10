@@ -1,12 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ShoppingCart, Plus, Minus, AlertCircle, ArrowLeft, MapPin, LocateFixed, Loader2 } from 'lucide-react';
+import { ShoppingCart, Plus, Minus, AlertCircle, ArrowLeft, MapPin, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence, useInView } from 'framer-motion';
 import { LocationMap } from '../components/LocationMap';
-import { WaveInput } from '../components/WaveInput';
-import { AddressModal, SavedLocation } from '../components/AddressModal';
+import { AddressModal } from '../components/AddressModal';
+import type { SavedLocation } from '../components/AddressModal';
 
-import { supabase } from '../lib/supabase';
 import { supabase } from '../lib/supabase';
 
 const MAX_PAYLOAD_GRAMS = 2000;
@@ -61,7 +60,6 @@ export function Marketplace() {
   const [loading, setLoading] = useState(true);
   const [cart, setCart] = useState<Record<string, number>>({});
   const [showCheckoutForm, setShowCheckoutForm] = useState(false);
-  const [showCheckoutForm, setShowCheckoutForm] = useState(false);
   const [deliveryAddress, setDeliveryAddress] = useState<SavedLocation | null>(null);
   const [showAddressModal, setShowAddressModal] = useState(false);
   
@@ -69,7 +67,6 @@ export function Marketplace() {
 
   useEffect(() => {
     fetchCatalog();
-    fetchSavedLocations();
 
     // Subscribe to realtime updates on the items table
     const channel = supabase
@@ -280,8 +277,6 @@ export function Marketplace() {
           onSelect={setDeliveryAddress}
           title="Select Destination"
         />
-          </div>
-        </div>
 
         {/* Sticky Confirm Button */}
         <div className="fixed bottom-24 left-0 right-0 px-6 z-40 pointer-events-none">
