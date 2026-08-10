@@ -1,10 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Package, ShoppingBag, Map, User, Moon, Sun, LocateFixed } from 'lucide-react';
+import { Package, ShoppingBag, Map, User, Moon, Sun } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { WaveInput } from '../components/WaveInput';
-import { LocationMap } from '../components/LocationMap';
-import { Geolocation } from '@capacitor/geolocation';
 
 const slides = [
   {
