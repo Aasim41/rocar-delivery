@@ -159,7 +159,9 @@ export function Marketplace() {
       }
     }
     
-    navigate(`/tracking/${orderId}?type=marketplace`);
+    const dropLat = deliveryAddress?.lat ?? 24.6380;
+    const dropLng = deliveryAddress?.lng ?? 77.3110;
+    navigate(`/tracking/${orderId}?type=marketplace&dropLat=${dropLat}&dropLng=${dropLng}`);
   };
 
   // Ensure consistent category names as requested

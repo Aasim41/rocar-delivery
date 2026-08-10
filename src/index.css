@@ -3,10 +3,10 @@
 
 @theme {
   --font-sans: 'Outfit', sans-serif;
-  --color-green: #16a34a;
-  --color-red: #dc2626;
-  --color-yellow: #eab308;
-  --color-sky: #0ea5e9;
+  --color-green: #10b981;
+  --color-red: #ef4444;
+  --color-yellow: #f59e0b;
+  --color-sky: #6366f1;
   --color-brown: #854d0e;
 }
 
@@ -23,14 +23,14 @@
   }
 
   .dark {
-    --bg-page: #000000;
-    --text-main: #f8fafc;
+    --bg-page: #0a0a0f;
+    --text-main: #f1f5f9;
     --text-muted: #94a3b8;
-    --border-color: rgba(255, 255, 255, 0.1);
-    --card-bg: rgba(20, 20, 20, 0.7);
-    --shadow-color: rgba(0, 0, 0, 0.5);
-    --glass-bg: rgba(0, 0, 0, 0.6);
-    --glass-border: rgba(255, 255, 255, 0.1);
+    --border-color: rgba(255, 255, 255, 0.08);
+    --card-bg: rgba(15, 15, 25, 0.75);
+    --shadow-color: rgba(0, 0, 0, 0.6);
+    --glass-bg: rgba(10, 10, 20, 0.7);
+    --glass-border: rgba(255, 255, 255, 0.08);
   }
 
   body {

@@ -139,8 +139,14 @@ export function OrderTracking() {
     return `${m}m ${s}s`;
   };
 
-  const startCoords = { lat: 24.6355, lng: 77.3090 };
-  const dropCoords = { lat: 24.6380, lng: 77.3110 };
+  const startCoords = { 
+    lat: parseFloat(searchParams.get('startLat') || '24.6355'), 
+    lng: parseFloat(searchParams.get('startLng') || '77.3090') 
+  };
+  const dropCoords = { 
+    lat: parseFloat(searchParams.get('dropLat') || '24.6380'), 
+    lng: parseFloat(searchParams.get('dropLng') || '77.3110') 
+  };
 
   if (isUnlocked) {
     return (

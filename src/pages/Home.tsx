@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Package, ShoppingBag } from 'lucide-react';
+import { PackageCheck, Store, Sparkles } from 'lucide-react';
 import { motion, useMotionValue, useSpring, useTransform } from 'framer-motion';
 
 function TiltCard({ to, icon: Icon, title, description, colorClass }: any) {
@@ -76,30 +76,34 @@ export function Home() {
       <div className="absolute top-[40%] right-[-20%] w-80 h-80 bg-[var(--color-green)] rounded-full opacity-10 blur-[100px] pointer-events-none z-0" />
 
       <header className="mb-12 mt-6 relative z-10">
+        <div className="flex items-center space-x-2 mb-1">
+          <Sparkles className="w-5 h-5 text-[var(--color-sky)] animate-pulse" />
+          <span className="text-xs font-bold uppercase tracking-[0.2em] text-[var(--color-sky)]">Autonomous Logistics</span>
+        </div>
         <h1 className="text-5xl font-extrabold text-[var(--text-main)] tracking-tight leading-tight">
           Delivery<br/>
-          <span className="text-[var(--color-sky)]">Robot</span>
+          <span className="bg-gradient-to-r from-[var(--color-sky)] to-purple-500 bg-clip-text text-transparent">Robot</span>
         </h1>
         <p className="text-lg font-medium text-[var(--text-muted)] mt-4">
-          Autonomous logistics for your campus.
+          Smart campus delivery at your fingertips.
         </p>
       </header>
 
       <div className="space-y-6 relative z-10">
         <TiltCard 
           to="/parcel-pickup"
-          icon={Package}
+          icon={PackageCheck}
           title="Send Parcel"
           description="A-to-B campus delivery"
-          colorClass="bg-gradient-to-br from-[var(--color-sky)] to-blue-600"
+          colorClass="bg-gradient-to-br from-[var(--color-sky)] via-purple-600 to-violet-700"
         />
 
         <TiltCard 
           to="/marketplace"
-          icon={ShoppingBag}
+          icon={Store}
           title="Marketplace"
           description="Order essentials from shops"
-          colorClass="bg-gradient-to-br from-[var(--color-yellow)] to-orange-500"
+          colorClass="bg-gradient-to-br from-amber-500 via-orange-500 to-rose-500"
         />
       </div>
     </motion.div>

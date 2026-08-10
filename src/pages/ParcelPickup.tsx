@@ -54,7 +54,11 @@ export function ParcelPickup() {
       }
     }
     
-    navigate(`/tracking/${orderId}?type=parcel`);
+    const startLat = pickup?.lat ?? 24.6355;
+    const startLng = pickup?.lng ?? 77.3090;
+    const dropLat = dropoff?.lat ?? 24.6380;
+    const dropLng = dropoff?.lng ?? 77.3110;
+    navigate(`/tracking/${orderId}?type=parcel&startLat=${startLat}&startLng=${startLng}&dropLat=${dropLat}&dropLng=${dropLng}`);
   };
 
   return (
