@@ -76,9 +76,18 @@ export function LocationMap({
   const isDark = useIsDark();
   const mapRef = useRef<google.maps.Map | null>(null);
 
-  const { isLoaded } = useJsApiLoader({
+  const { isLoaded, loadError } = useJsApiLoader({
     googleMapsApiKey: GOOGLE_MAPS_API_KEY,
   });
+
+  if (loadError) {
+    return (
+      <div className="w-full h-full rounded-2xl overflow-hidden border border-red-500/30 flex flex-col items-center justify-center bg-[var(--card-bg)] p-4 text-center">
+        <p className="text-red-400 font-bold text-sm mb-2">Map Error</p>
+        <p className="text-[var(--text-muted)] text-xs break-all">{loadError.message}</p>
+      </div>
+    );
+  }
 
   const validLocs = locations.filter((l) => l.address && l.address.length > 1);
   const locKey = validLocs.map((l) => l.address).join(',');
