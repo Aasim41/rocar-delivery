@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { GoogleMap, useJsApiLoader, Marker, Polyline } from '@react-google-maps/api';
 
 const GOOGLE_MAPS_API_KEY = 'AIzaSyCRBf2b1voiT2blqKtlXZp8z1hSE04Vwmc';
@@ -41,19 +41,16 @@ function generateCurvedPath(
   const midLat = (start.lat + end.lat) / 2;
   const midLng = (start.lng + end.lng) / 2;
   
-  // Calculate perpendicular offset for the curve
   const dx = end.lng - start.lng;
   const dy = end.lat - start.lat;
   const dist = Math.sqrt(dx * dx + dy * dy);
-  const offset = dist * 0.15; // 15% curve intensity
+  const offset = dist * 0.15;
   
-  // Perpendicular direction
   const controlLat = midLat + (-dx / dist) * offset;
   const controlLng = midLng + (dy / dist) * offset;
   
   for (let i = 0; i <= numPoints; i++) {
     const t = i / numPoints;
-    // Quadratic Bezier curve
     const lat = (1 - t) * (1 - t) * start.lat + 2 * (1 - t) * t * controlLat + t * t * end.lat;
     const lng = (1 - t) * (1 - t) * start.lng + 2 * (1 - t) * t * controlLng + t * t * end.lng;
     points.push({ lat, lng });
@@ -82,10 +79,10 @@ export function LiveMap({ startLat, startLng, dropLat, dropLng, currentLat, curr
     googleMapsApiKey: GOOGLE_MAPS_API_KEY,
   });
 
-  const curvedPath = generateCurvedPath(
+  const curvedPath = useMemo(() => generateCurvedPath(
     { lat: startLat, lng: startLng },
     { lat: dropLat, lng: dropLng }
-  );
+  ), [startLat, startLng, dropLat, dropLng]);
 
   // Simulate movement along the curved path
   useEffect(() => {
