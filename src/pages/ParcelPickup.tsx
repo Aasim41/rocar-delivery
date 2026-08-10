@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MapPin, Navigation as NavIcon, ArrowLeft, Route } from 'lucide-react';
 import { LocationMap } from '../components/LocationMap';
