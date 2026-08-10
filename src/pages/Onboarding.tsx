@@ -167,7 +167,6 @@ export function Onboarding({ onComplete }: { onComplete?: () => void }) {
                 </div>
 
                 </div>
-              </div>
             </motion.form>
           )}
         </AnimatePresence>

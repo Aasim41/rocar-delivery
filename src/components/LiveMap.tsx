@@ -1,27 +1,35 @@
-import { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
+import { useEffect, useState, useCallback, useRef } from 'react';
+import { GoogleMap, useJsApiLoader, Marker, Polyline } from '@react-google-maps/api';
 
-// Fix Leaflet's default icon paths for Vite
-import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
-import markerIcon from 'leaflet/dist/images/marker-icon.png';
-import markerShadow from 'leaflet/dist/images/marker-shadow.png';
+const GOOGLE_MAPS_API_KEY = 'AIzaSyCRBf2b1voiT2blqKtlXZp8z1hSE04Vwmc';
 
-delete (L.Icon.Default.prototype as any)._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconUrl: markerIcon,
-  iconRetinaUrl: markerIcon2x,
-  shadowUrl: markerShadow,
-});
+const mapContainerStyle = { width: '100%', height: '100%' };
 
-// Custom robot icon
-const robotIcon = new L.Icon({
-  iconUrl: 'https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/bot.svg',
-  iconSize: [32, 32],
-  iconAnchor: [16, 16],
-  className: 'bg-blue-600 rounded-full p-1 border-2 border-white shadow-lg'
-});
+const darkMapStyles = [
+  { elementType: 'geometry', stylers: [{ color: '#212121' }] },
+  { elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
+  { elementType: 'labels.text.fill', stylers: [{ color: '#757575' }] },
+  { elementType: 'labels.text.stroke', stylers: [{ color: '#212121' }] },
+  { featureType: 'administrative', elementType: 'geometry', stylers: [{ color: '#757575' }] },
+  { featureType: 'poi', elementType: 'geometry', stylers: [{ color: '#181818' }] },
+  { featureType: 'road', elementType: 'geometry.fill', stylers: [{ color: '#2c2c2c' }] },
+  { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#212121' }] },
+  { featureType: 'road.highway', elementType: 'geometry.fill', stylers: [{ color: '#3c3c3c' }] },
+  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#000000' }] },
+  { featureType: 'water', elementType: 'labels.text.fill', stylers: [{ color: '#3d3d3d' }] },
+];
+
+function useIsDark() {
+  const [isDark, setIsDark] = useState(false);
+  useEffect(() => {
+    const check = () => setIsDark(document.documentElement.classList.contains('dark'));
+    check();
+    const observer = new MutationObserver(check);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
+  return isDark;
+}
 
 interface LiveMapProps {
   startLat: number;
@@ -33,76 +41,138 @@ interface LiveMapProps {
 }
 
 export function LiveMap({ startLat, startLng, dropLat, dropLng, currentLat, currentLng }: LiveMapProps) {
-  const [robotPos, setRobotPos] = useState<[number, number]>([currentLat || startLat, currentLng || startLng]);
+  const isDark = useIsDark();
+  const mapRef = useRef<google.maps.Map | null>(null);
+  const [robotPos, setRobotPos] = useState<{ lat: number; lng: number }>({
+    lat: currentLat || startLat,
+    lng: currentLng || startLng,
+  });
+
+  const { isLoaded } = useJsApiLoader({
+    googleMapsApiKey: GOOGLE_MAPS_API_KEY,
+  });
 
   // Simulate movement for the demo if current position isn't provided real-time
   useEffect(() => {
     if (currentLat && currentLng) {
-      setRobotPos([currentLat, currentLng]);
+      setRobotPos({ lat: currentLat, lng: currentLng });
       return;
     }
 
-    // Simple linear interpolation simulation for demo
     let progress = 0;
     const interval = setInterval(() => {
       progress += 0.05;
       if (progress >= 1) progress = 1;
-      
+
       const newLat = startLat + (dropLat - startLat) * progress;
       const newLng = startLng + (dropLng - startLng) * progress;
-      
-      setRobotPos([newLat, newLng]);
-      
+
+      setRobotPos({ lat: newLat, lng: newLng });
+
       if (progress >= 1) clearInterval(interval);
     }, 1000);
 
     return () => clearInterval(interval);
   }, [startLat, startLng, dropLat, dropLng, currentLat, currentLng]);
 
-  const center: [number, number] = [
-    (startLat + dropLat) / 2,
-    (startLng + dropLng) / 2
+  const center = {
+    lat: (startLat + dropLat) / 2,
+    lng: (startLng + dropLng) / 2,
+  };
+
+  const onLoad = useCallback(
+    (map: google.maps.Map) => {
+      mapRef.current = map;
+      const bounds = new google.maps.LatLngBounds();
+      bounds.extend({ lat: startLat, lng: startLng });
+      bounds.extend({ lat: dropLat, lng: dropLng });
+      map.fitBounds(bounds, 50);
+    },
+    [startLat, startLng, dropLat, dropLng]
+  );
+
+  if (!isLoaded) {
+    return (
+      <div className="w-full h-full rounded-2xl overflow-hidden shadow-sm border border-gray-200 flex items-center justify-center bg-[var(--card-bg)]">
+        <div className="animate-pulse text-[var(--text-muted)] text-sm">Loading map...</div>
+      </div>
+    );
+  }
+
+  const mapOptions: google.maps.MapOptions = {
+    disableDefaultUI: true,
+    zoomControl: true,
+    gestureHandling: 'greedy',
+    styles: isDark ? darkMapStyles : undefined,
+    mapTypeControl: false,
+    streetViewControl: false,
+    fullscreenControl: false,
+  };
+
+  const routePath = [
+    { lat: startLat, lng: startLng },
+    { lat: dropLat, lng: dropLng },
   ];
+
+  // Custom robot icon using a simple SVG data URI
+  const robotIcon: google.maps.Icon = {
+    url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+      <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">
+        <circle cx="20" cy="20" r="18" fill="#3b82f6" stroke="white" stroke-width="3"/>
+        <text x="20" y="26" text-anchor="middle" fill="white" font-size="20">🤖</text>
+      </svg>
+    `),
+    scaledSize: new google.maps.Size(40, 40),
+    anchor: new google.maps.Point(20, 20),
+  };
 
   return (
     <div className="w-full h-full rounded-2xl overflow-hidden shadow-sm border border-gray-200">
-      <MapContainer 
-        center={center} 
-        zoom={16} 
-        style={{ height: '100%', width: '100%' }}
-        zoomControl={true}
-        dragging={true}
-        scrollWheelZoom={true}
+      <GoogleMap
+        mapContainerStyle={mapContainerStyle}
+        center={center}
+        zoom={16}
+        onLoad={onLoad}
+        options={mapOptions}
       >
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-          url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
-        />
-        
         {/* Route Line */}
-        <Polyline 
-          positions={[[startLat, startLng], [dropLat, dropLng]]} 
-          color="#3b82f6" 
-          weight={4}
-          dashArray="8, 8"
-          opacity={0.6}
+        <Polyline
+          path={routePath}
+          options={{
+            strokeColor: '#3b82f6',
+            strokeWeight: 4,
+            strokeOpacity: 0.6,
+            icons: [
+              {
+                icon: { path: 'M 0,-1 0,1', strokeOpacity: 1, scale: 3 },
+                offset: '0',
+                repeat: '16px',
+              },
+            ],
+          }}
         />
 
         {/* Start Point */}
-        <Marker position={[startLat, startLng]}>
-          <Popup>Pickup</Popup>
-        </Marker>
+        <Marker
+          position={{ lat: startLat, lng: startLng }}
+          label={{ text: 'Pickup', color: '#fff', fontWeight: 'bold', fontSize: '11px' }}
+          animation={google.maps.Animation.DROP}
+        />
 
         {/* Drop Point */}
-        <Marker position={[dropLat, dropLng]}>
-          <Popup>Destination</Popup>
-        </Marker>
+        <Marker
+          position={{ lat: dropLat, lng: dropLng }}
+          label={{ text: 'Drop', color: '#fff', fontWeight: 'bold', fontSize: '11px' }}
+          animation={google.maps.Animation.DROP}
+        />
 
         {/* Robot */}
-        <Marker position={robotPos} icon={robotIcon} zIndexOffset={1000}>
-          <Popup>Robot Location</Popup>
-        </Marker>
-      </MapContainer>
+        <Marker
+          position={robotPos}
+          icon={robotIcon}
+          zIndex={1000}
+        />
+      </GoogleMap>
     </div>
   );
 }

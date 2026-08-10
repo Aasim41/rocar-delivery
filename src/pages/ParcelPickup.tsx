@@ -5,7 +5,8 @@ import { LocationMap } from '../components/LocationMap';
 import { motion } from 'framer-motion';
 import { supabase } from '../lib/supabase';
 import { WaveInput } from '../components/WaveInput';
-import { AddressModal, SavedLocation } from '../components/AddressModal';
+import { AddressModal } from '../components/AddressModal';
+import type { SavedLocation } from '../components/AddressModal';
 
 export function ParcelPickup() {
   const [pickup, setPickup] = useState<SavedLocation | null>(null);
