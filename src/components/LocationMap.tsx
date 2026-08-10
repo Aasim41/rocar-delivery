@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef, useMemo, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -35,7 +35,7 @@ function getMockCoords(address: string): [number, number] {
   return [defaultPos[0] + latOffset, defaultPos[1] + lngOffset];
 }
 
-export function LocationMap({ locations, onLocationSelect }: { locations: { address: string, label: string }[], onLocationSelect?: (address: string) => void }) {
+export function LocationMap({ locations, onLocationSelect, draggable = false }: { locations: { address: string, label: string }[], onLocationSelect?: (address: string) => void, draggable?: boolean }) {
   const validLocs = locations.filter(l => l.address && l.address.length > 1);
   const mainPos = validLocs.length > 0 ? getMockCoords(validLocs[0].address) : [24.6355, 77.3090];
 
@@ -73,13 +73,63 @@ export function LocationMap({ locations, onLocationSelect }: { locations: { addr
     <div className="w-full h-full rounded-2xl overflow-hidden shadow-sm border border-[var(--border-color)]">
       <MapContainer center={mainPos as [number, number]} zoom={16} style={{ height: '100%', width: '100%' }} zoomControl={true} dragging={true} scrollWheelZoom={true}>
         <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" />
-        {validLocs.map((loc, i) => (
-          <Marker key={i} position={getMockCoords(loc.address)}>
-            <Popup>{loc.label}</Popup>
-          </Marker>
-        ))}
+        {validLocs.map((loc, i) => {
+          const position = getMockCoords(loc.address);
+          
+          if (draggable && i === 0 && onLocationSelect) {
+            return (
+              <DraggableMarker 
+                key={i} 
+                initialPosition={position} 
+                label={loc.label} 
+                onDragEnd={(lat, lng) => onLocationSelect(`GPS: ${lat.toFixed(5)}, ${lng.toFixed(5)}`)} 
+              />
+            );
+          }
+          
+          return (
+            <Marker key={i} position={position}>
+              <Popup>{loc.label}</Popup>
+            </Marker>
+          );
+        })}
         <MapController />
       </MapContainer>
     </div>
+  );
+}
+
+function DraggableMarker({ initialPosition, label, onDragEnd }: { initialPosition: [number, number], label: string, onDragEnd: (lat: number, lng: number) => void }) {
+  const [position, setPosition] = useState(initialPosition);
+  const markerRef = useRef<L.Marker>(null);
+  
+  // Sync if initialPosition changes from outside (e.g. GPS fetch)
+  useEffect(() => {
+    setPosition(initialPosition);
+  }, [initialPosition[0], initialPosition[1]]);
+
+  const eventHandlers = useMemo(
+    () => ({
+      dragend() {
+        const marker = markerRef.current;
+        if (marker != null) {
+          const newPos = marker.getLatLng();
+          setPosition([newPos.lat, newPos.lng]);
+          onDragEnd(newPos.lat, newPos.lng);
+        }
+      },
+    }),
+    [onDragEnd],
+  );
+
+  return (
+    <Marker
+      draggable={true}
+      eventHandlers={eventHandlers}
+      position={position}
+      ref={markerRef}
+    >
+      <Popup>{label}</Popup>
+    </Marker>
   );
 }

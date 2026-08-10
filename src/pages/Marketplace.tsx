@@ -4,9 +4,10 @@ import { ShoppingCart, Plus, Minus, AlertCircle, ArrowLeft, MapPin, LocateFixed,
 import { motion, AnimatePresence, useInView } from 'framer-motion';
 import { LocationMap } from '../components/LocationMap';
 import { WaveInput } from '../components/WaveInput';
+import { AddressModal, SavedLocation } from '../components/AddressModal';
 
 import { supabase } from '../lib/supabase';
-import { Geolocation } from '@capacitor/geolocation';
+import { supabase } from '../lib/supabase';
 
 const MAX_PAYLOAD_GRAMS = 2000;
 
@@ -60,17 +61,10 @@ export function Marketplace() {
   const [loading, setLoading] = useState(true);
   const [cart, setCart] = useState<Record<string, number>>({});
   const [showCheckoutForm, setShowCheckoutForm] = useState(false);
-  const [deliveryAddress, setDeliveryAddress] = useState('');
-  const [customAddress, setCustomAddress] = useState('');
-  const [saveNewAddress, setSaveNewAddress] = useState(false);
+  const [showCheckoutForm, setShowCheckoutForm] = useState(false);
+  const [deliveryAddress, setDeliveryAddress] = useState<SavedLocation | null>(null);
+  const [showAddressModal, setShowAddressModal] = useState(false);
   
-  const [savedLocations, setSavedLocations] = useState<any[]>([]);
-  const [loadingLocations, setLoadingLocations] = useState(true);
-  
-  // GPS States
-  const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
-  const [locating, setLocating] = useState(false);
-
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -102,19 +96,6 @@ export function Marketplace() {
     setLoading(false);
   };
 
-
-
-  const fetchSavedLocations = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session) {
-      const { data } = await supabase.from('users').select('saved_locations').eq('id', session.user.id).single();
-      if (data && data.saved_locations) {
-        setSavedLocations(data.saved_locations);
-      }
-    }
-    setLoadingLocations(false);
-  };
-
   const updateCart = (id: string, delta: number) => {
     setCart(prev => {
       const current = prev[id] || 0;
@@ -142,19 +123,10 @@ export function Marketplace() {
 
   const handleCheckoutSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    const finalAddress = deliveryAddress === 'custom' ? customAddress : deliveryAddress;
     
-    if (itemCount === 0 || isOverweight || !finalAddress) return;
+    if (itemCount === 0 || isOverweight || !deliveryAddress) return;
     
     const { data: { session } } = await supabase.auth.getSession();
-    
-    // Save new address if requested
-    if (deliveryAddress === 'custom' && saveNewAddress && customAddress.trim()) {
-      if (session) {
-        const newLocations = [...savedLocations, { name: customAddress.trim() }];
-        await supabase.from('users').update({ saved_locations: newLocations }).eq('id', session.user.id);
-      }
-    }
     
     let orderId = Math.random().toString(36).substring(7); // Fallback for guest demo users
     
@@ -206,7 +178,7 @@ export function Marketplace() {
     return (
       <motion.div 
         initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 50 }}
-        className="min-h-screen bg-[var(--bg-page)] flex flex-col font-sans relative overflow-hidden pb-32"
+        className="min-h-screen bg-[var(--bg-page)] flex flex-col font-sans relative overflow-hidden pb-40"
       >
         <div className="absolute top-0 right-0 w-96 h-96 bg-[var(--color-sky)] rounded-full opacity-10 blur-[100px] pointer-events-none z-0" />
         
@@ -262,101 +234,52 @@ export function Marketplace() {
           <div className="glass-card p-6">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-lg font-bold text-[var(--text-main)]">Delivery Details</h2>
-              <div className={`flex items-center space-x-1 px-2 py-1 rounded-lg text-[10px] font-bold ${
-                locating ? 'bg-[var(--color-yellow)]/20 text-[var(--color-yellow)]' : 
-                userLocation ? 'bg-[var(--color-green)]/20 text-[var(--color-green)]' : 
-                'bg-[var(--color-red)]/20 text-[var(--color-red)]'
-              }`}>
-                {locating ? <Loader2 className="w-3 h-3 animate-spin" /> : <LocateFixed className="w-3 h-3" />}
-                <span>{locating ? 'Locating...' : userLocation ? 'GPS OK' : 'No GPS'}</span>
-              </div>
             </div>
 
             <form id="checkout-form" onSubmit={handleCheckoutSubmit} className="space-y-4">
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <MapPin className="h-5 w-5 text-[var(--text-muted)]" />
+              <button
+                type="button"
+                onClick={() => setShowAddressModal(true)}
+                className="w-full flex items-center p-4 bg-[var(--bg-page)]/50 border border-[var(--border-color)] rounded-2xl hover:border-[var(--color-sky)] transition-all text-left"
+              >
+                <div className="w-10 h-10 rounded-full bg-[var(--color-sky)]/10 flex items-center justify-center mr-4">
+                  <MapPin className="h-5 w-5 text-[var(--color-sky)]" />
                 </div>
-                <select
-                  required
-                  disabled={loadingLocations}
-                  value={deliveryAddress}
-                  onChange={async (e) => {
-                    const val = e.target.value;
-                    if (val === 'gps') {
-                      setLocating(true);
-                      try {
-                        const position = await Geolocation.getCurrentPosition();
-                        setUserLocation({ lat: position.coords.latitude, lng: position.coords.longitude });
-                        setDeliveryAddress('Current Location (GPS)');
-                      } catch (error) {
-                        console.error("Location error:", error);
-                        alert("Please enable GPS permissions to use this feature.");
-                        setDeliveryAddress('');
-                      } finally {
-                        setLocating(false);
-                      }
-                    } else if (val === 'custom') {
-                      setDeliveryAddress('custom');
-                      setLocating(true);
-                      Geolocation.getCurrentPosition()
-                        .then(position => setUserLocation({ lat: position.coords.latitude, lng: position.coords.longitude }))
-                        .catch(error => console.error("Background location error:", error))
-                        .finally(() => setLocating(false));
-                    } else {
-                      setDeliveryAddress(val);
-                    }
-                  }}
-                  className="block w-full pl-12 pr-4 py-4 bg-[var(--bg-page)]/50 border border-[var(--border-color)] rounded-2xl text-[var(--text-main)] font-medium focus:outline-none focus:ring-2 focus:ring-[var(--color-sky)] transition-all appearance-none disabled:opacity-50"
-                >
-                  <option value="" disabled>{loadingLocations ? 'Loading addresses...' : 'Select drop-off location...'}</option>
-                  <option value="gps">📍 Use Current Location (GPS)</option>
-                  {savedLocations.map((loc, idx) => (
-                    <option key={idx} value={loc.name}>⭐ {loc.name}</option>
-                  ))}
-                  <option value="custom">+ Type a new address</option>
-                </select>
-              </div>
-              {deliveryAddress === 'custom' && (
-                <div className="mt-2 space-y-2 bg-[var(--bg-page)]/30 p-4 rounded-xl border border-[var(--border-color)]">
-                  <div className="pt-2">
-                    <WaveInput 
-                      type="text" 
-                      required
-                      label="Destination Address"
-                      value={customAddress}
-                      onChange={e => setCustomAddress(e.target.value)}
-                    />
-                  </div>
-                  <label className="flex items-center space-x-2 text-sm text-[var(--text-main)] px-1 cursor-pointer pt-2 mt-2">
-                    <input type="checkbox" checked={saveNewAddress} onChange={e => setSaveNewAddress(e.target.checked)} className="rounded text-[var(--color-sky)] focus:ring-[var(--color-sky)] w-4 h-4" />
-                    <span>Save this address for next time</span>
-                  </label>
+                <div className="flex-1">
+                  {deliveryAddress ? (
+                    <>
+                      <p className="font-bold text-[var(--text-main)]">{deliveryAddress.name}</p>
+                      <p className="text-xs text-[var(--text-muted)] font-mono mt-0.5">{deliveryAddress.lat?.toFixed(5)}, {deliveryAddress.lng?.toFixed(5)}</p>
+                    </>
+                  ) : (
+                    <p className="text-[var(--text-main)] font-medium">Select drop-off location...</p>
+                  )}
                 </div>
-              )}
+              </button>
 
               {/* Map Preview */}
-              {(deliveryAddress && deliveryAddress !== 'custom' || (deliveryAddress === 'custom' && customAddress.length > 2)) && (
+              {deliveryAddress && deliveryAddress.lat !== undefined && deliveryAddress.lng !== undefined && (
                 <div className="h-40 mt-4 rounded-xl overflow-hidden shadow-inner border border-[var(--border-color)]">
                   <LocationMap 
                     locations={[
                       { 
-                        address: deliveryAddress === 'custom' && userLocation 
-                          ? `GPS: ${userLocation.lat}, ${userLocation.lng}` 
-                          : (deliveryAddress === 'Current Location (GPS)' && userLocation) 
-                              ? `GPS: ${userLocation.lat}, ${userLocation.lng}`
-                              : (deliveryAddress === 'custom' ? customAddress : deliveryAddress), 
-                        label: "Drop-off Location" 
+                        address: `GPS: ${deliveryAddress.lat}, ${deliveryAddress.lng}`, 
+                        label: deliveryAddress.name
                       }
                     ]} 
-                    onLocationSelect={(val) => {
-                      setDeliveryAddress('custom');
-                      setCustomAddress(val);
-                    }}
                   />
                 </div>
               )}
             </form>
+          </div>
+        </div>
+
+        <AddressModal 
+          isOpen={showAddressModal}
+          onClose={() => setShowAddressModal(false)}
+          onSelect={setDeliveryAddress}
+          title="Select Destination"
+        />
           </div>
         </div>
 
@@ -366,7 +289,7 @@ export function Marketplace() {
             <button 
               form="checkout-form"
               type="submit"
-              disabled={!deliveryAddress || (deliveryAddress === 'custom' && !customAddress)}
+              disabled={!deliveryAddress}
               className="w-full minimal-button bg-[var(--color-green)] text-white text-base py-3.5 flex justify-between items-center px-5 disabled:opacity-50 shadow-xl hover:shadow-2xl transition-shadow"
             >
               <span className="font-bold">Place Order</span>
@@ -381,7 +304,7 @@ export function Marketplace() {
   return (
     <motion.div 
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      className="pb-32 min-h-screen font-sans relative overflow-hidden"
+      className="pb-40 min-h-screen font-sans relative overflow-hidden"
     >
       <div className="absolute top-0 right-0 w-96 h-96 bg-[var(--color-yellow)] rounded-full opacity-10 blur-[100px] pointer-events-none z-0" />
       <div className="absolute top-[50%] left-[-10%] w-80 h-80 bg-[var(--color-sky)] rounded-full opacity-10 blur-[100px] pointer-events-none z-0" />

@@ -76,8 +76,6 @@ function AppRoutes() {
         const nameToInsert = localStorage.getItem('onboarding_name') || '';
         const ageStr = localStorage.getItem('onboarding_age');
         const ageToInsert = ageStr ? parseInt(ageStr, 10) : null;
-        const addressToInsert = localStorage.getItem('onboarding_address');
-        const initialLocations = addressToInsert ? [{ name: addressToInsert }] : [];
         
         const { data: newData, error: insertError } = await supabase
           .from('users')
@@ -85,8 +83,7 @@ function AppRoutes() {
             id: userId, 
             role: roleToInsert,
             name: nameToInsert,
-            age: ageToInsert,
-            saved_locations: initialLocations
+            age: ageToInsert
           }])
           .select('role')
           .single();
@@ -107,20 +104,11 @@ function AppRoutes() {
         // If we just finished onboarding and have data in local storage, sync it to the existing profile
         const nameToInsert = localStorage.getItem('onboarding_name');
         const ageStr = localStorage.getItem('onboarding_age');
-        const addressToInsert = localStorage.getItem('onboarding_address');
         
-        if (nameToInsert || ageStr || addressToInsert) {
+        if (nameToInsert || ageStr) {
            const updates: any = {};
            if (nameToInsert) updates.name = nameToInsert;
            if (ageStr) updates.age = parseInt(ageStr, 10);
-           if (addressToInsert) {
-              // Fetch full profile to get current locations
-              const { data: fullProfile } = await supabase.from('users').select('saved_locations').eq('id', userId).single();
-              const currentLocations = (fullProfile && fullProfile.saved_locations) ? fullProfile.saved_locations : [];
-              if (!currentLocations.some((loc: any) => loc.name === addressToInsert)) {
-                  updates.saved_locations = [...currentLocations, { name: addressToInsert }];
-              }
-           }
            
            if (Object.keys(updates).length > 0) {
               const { error: updateError } = await supabase.from('users').update(updates).eq('id', userId);
@@ -130,7 +118,6 @@ function AppRoutes() {
               } else {
                 localStorage.removeItem('onboarding_name');
                 localStorage.removeItem('onboarding_age');
-                localStorage.removeItem('onboarding_address');
               }
            }
         }

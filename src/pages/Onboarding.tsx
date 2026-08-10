@@ -38,7 +38,6 @@ export function Onboarding({ onComplete }: { onComplete?: () => void }) {
   // Profile collection state
   const [name, setName] = useState('');
   const [age, setAge] = useState('');
-  const [address, setAddress] = useState('');
   const [isDarkMode, setIsDarkMode] = useState(
     () => document.documentElement.classList.contains('dark')
   );
@@ -66,7 +65,6 @@ export function Onboarding({ onComplete }: { onComplete?: () => void }) {
     localStorage.setItem('has_seen_onboarding', 'true');
     localStorage.setItem('onboarding_name', name);
     localStorage.setItem('onboarding_age', age);
-    localStorage.setItem('onboarding_address', address);
     
     if (onComplete) {
       onComplete();
@@ -168,46 +166,7 @@ export function Onboarding({ onComplete }: { onComplete?: () => void }) {
                   />
                 </div>
 
-                <div className="pt-2 relative">
-                  <WaveInput
-                    type="text"
-                    label="Location (e.g. Dorm)"
-                    value={address}
-                    onChange={(e) => setAddress(e.target.value)}
-                  />
-                  <button 
-                    type="button"
-                    onClick={async () => {
-                      try {
-                        const position = await Geolocation.getCurrentPosition();
-                        setAddress(`${position.coords.latitude}, ${position.coords.longitude}`);
-                      } catch (error) {
-                        console.error(error);
-                        alert("Please enable GPS permissions to use this feature.");
-                      }
-                    }}
-                    className="absolute right-0 top-6 text-[var(--color-sky)] p-2 hover:bg-[var(--color-sky)]/10 rounded-full transition-colors"
-                    title="Use GPS"
-                  >
-                    <LocateFixed className="w-5 h-5" />
-                  </button>
                 </div>
-
-                <AnimatePresence>
-                  {address.length > 2 && (
-                    <motion.div 
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: 200, opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      className="mt-4 rounded-xl overflow-hidden shadow-inner border border-[var(--border-color)]"
-                    >
-                      <LocationMap 
-                        locations={[{ address, label: "Your Location" }]} 
-                        onLocationSelect={setAddress}
-                      />
-                    </motion.div>
-                  )}
-                </AnimatePresence>
               </div>
             </motion.form>
           )}
@@ -243,7 +202,7 @@ export function Onboarding({ onComplete }: { onComplete?: () => void }) {
           ) : (
             <button
               onClick={() => handleFinish()}
-              disabled={!name || !age || !address}
+              disabled={!name || !age}
               className="w-full minimal-button bg-[var(--color-sky)] text-white font-semibold py-4 rounded-xl shadow-lg hover:opacity-90 transition-opacity text-lg disabled:opacity-50"
             >
               Get Started

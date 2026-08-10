@@ -5,68 +5,24 @@ import { LocationMap } from '../components/LocationMap';
 import { motion } from 'framer-motion';
 import { supabase } from '../lib/supabase';
 import { WaveInput } from '../components/WaveInput';
-import { Geolocation } from '@capacitor/geolocation';
+import { AddressModal, SavedLocation } from '../components/AddressModal';
 
 export function ParcelPickup() {
-  const [pickup, setPickup] = useState('');
-  const [dropoff, setDropoff] = useState('');
-  const [customPickup, setCustomPickup] = useState('');
-  const [customDropoff, setCustomDropoff] = useState('');
-  const [saveNewDropoff, setSaveNewDropoff] = useState(false);
+  const [pickup, setPickup] = useState<SavedLocation | null>(null);
+  const [dropoff, setDropoff] = useState<SavedLocation | null>(null);
   const [parcelDescription, setParcelDescription] = useState('');
   
-  const [savedLocations, setSavedLocations] = useState<any[]>([]);
-  const [loadingLocations, setLoadingLocations] = useState(true);
+  const [showPickupModal, setShowPickupModal] = useState(false);
+  const [showDropoffModal, setShowDropoffModal] = useState(false);
   
   const navigate = useNavigate();
 
-  const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
-
-  useEffect(() => {
-    fetchSavedLocations();
-  }, []);
-
-  const fetchSavedLocations = async () => {
-    let currentUserId = null;
-    const { data: { session } } = await supabase.auth.getSession();
-    
-    if (session) {
-      currentUserId = session.user.id;
-    } else if (localStorage.getItem('demo_mode') === 'buyer') {
-      currentUserId = 'demo-user-123';
-    }
-    
-    if (currentUserId) {
-      const { data } = await supabase.from('users').select('saved_locations').eq('id', currentUserId).single();
-      if (data && data.saved_locations) {
-        setSavedLocations(data.saved_locations);
-      }
-    }
-    setLoadingLocations(false);
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const finalPickup = pickup === 'custom' ? customPickup : pickup;
-    const finalDropoff = dropoff === 'custom' ? customDropoff : dropoff;
     
-    if (!finalPickup || !finalDropoff) return;
+    if (!pickup || !dropoff) return;
     
     const { data: { session } } = await supabase.auth.getSession();
-    
-    if (dropoff === 'custom' && saveNewDropoff && customDropoff.trim()) {
-      let currentUserId = null;
-      if (session) {
-        currentUserId = session.user.id;
-      } else if (localStorage.getItem('demo_mode') === 'buyer') {
-        currentUserId = 'demo-user-123';
-      }
-      
-      if (currentUserId) {
-        const newLocations = [...savedLocations, { name: customDropoff.trim() }];
-        await supabase.from('users').update({ saved_locations: newLocations }).eq('id', currentUserId);
-      }
-    }
     
     let orderId = Math.random().toString(36).substring(7);
     
@@ -115,26 +71,13 @@ export function ParcelPickup() {
       <div className="flex-1 relative z-10">
         <LocationMap 
           locations={[
-            ...(pickup && pickup !== 'custom' 
-              ? [{ address: pickup === 'Current Location (GPS)' && userLocation ? `GPS: ${userLocation.lat}, ${userLocation.lng}` : pickup, label: "Pickup" }] 
-              : (pickup === 'custom' && customPickup.length > 2) 
-                  ? [{ address: userLocation ? `GPS: ${userLocation.lat}, ${userLocation.lng}` : customPickup, label: "Pickup" }] 
-                  : []),
-            ...(dropoff && dropoff !== 'custom' 
-              ? [{ address: dropoff === 'Current Location (GPS)' && userLocation ? `GPS: ${userLocation.lat}, ${userLocation.lng}` : dropoff, label: "Destination" }] 
-              : (dropoff === 'custom' && customDropoff.length > 2) 
-                  ? [{ address: userLocation ? `GPS: ${userLocation.lat}, ${userLocation.lng}` : customDropoff, label: "Destination" }] 
-                  : []),
+            ...(pickup && pickup.lat !== undefined && pickup.lng !== undefined
+              ? [{ address: `GPS: ${pickup.lat}, ${pickup.lng}`, label: "Pickup" }] 
+              : []),
+            ...(dropoff && dropoff.lat !== undefined && dropoff.lng !== undefined
+              ? [{ address: `GPS: ${dropoff.lat}, ${dropoff.lng}`, label: "Destination" }] 
+              : []),
           ]}
-          onLocationSelect={(val) => {
-            if (!pickup || (pickup === 'custom' && !customPickup)) {
-              setPickup('custom');
-              setCustomPickup(val);
-            } else {
-              setDropoff('custom');
-              setCustomDropoff(val);
-            }
-          }}
         />
       </div>
 
@@ -142,120 +85,56 @@ export function ParcelPickup() {
         initial={{ y: '100%' }}
         animate={{ y: 0 }}
         transition={{ type: "spring", damping: 25, stiffness: 200 }}
-        className="glass-panel p-6 pb-28 shrink-0 z-20 rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.1)]"
+        className="glass-panel p-6 pb-40 shrink-0 z-20 rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.1)]"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
           
           {/* Pickup Selection */}
           <div className="space-y-2">
             <label className="text-sm font-bold text-[var(--text-main)] px-1">Pickup Location</label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                <MapPin className="h-5 w-5 text-[var(--text-muted)]" />
+            <button
+              type="button"
+              onClick={() => setShowPickupModal(true)}
+              className="w-full flex items-center p-4 bg-[var(--card-bg)] border border-[var(--border-color)] rounded-2xl hover:border-[var(--color-sky)] transition-all text-left"
+            >
+              <div className="w-10 h-10 rounded-full bg-[var(--color-sky)]/10 flex items-center justify-center mr-4">
+                <MapPin className="h-5 w-5 text-[var(--color-sky)]" />
               </div>
-              <select
-                required
-                value={pickup}
-                onChange={async (e) => {
-                  const val = e.target.value;
-                  if (val === 'Current Location (GPS)') {
-                    try {
-                      const position = await Geolocation.getCurrentPosition();
-                      setUserLocation({ lat: position.coords.latitude, lng: position.coords.longitude });
-                      setPickup('Current Location (GPS)');
-                    } catch (error) {
-                      console.error("Location error:", error);
-                      alert("Please enable GPS permissions to use this feature.");
-                      setPickup('');
-                    }
-                  } else if (val === 'custom') {
-                    setPickup('custom');
-                    Geolocation.getCurrentPosition()
-                      .then(position => setUserLocation({ lat: position.coords.latitude, lng: position.coords.longitude }))
-                      .catch(error => console.error("Background location error:", error));
-                  } else {
-                    setPickup(val);
-                  }
-                }}
-                className="block w-full pl-12 pr-4 py-4 bg-[var(--card-bg)] border border-[var(--border-color)] rounded-2xl text-[var(--text-main)] font-medium focus:outline-none focus:ring-2 focus:ring-[var(--color-sky)] transition-all appearance-none"
-              >
-                <option value="" disabled>Select pickup...</option>
-                <option value="Current Location (GPS)">📍 Use Current Location (GPS)</option>
-                <option value="custom">+ Type a custom address</option>
-              </select>
-            </div>
-            {pickup === 'custom' && (
-              <div className="pt-2">
-                <WaveInput 
-                  type="text" 
-                  required
-                  label="Pickup Address"
-                  value={customPickup}
-                  onChange={e => setCustomPickup(e.target.value)}
-                />
+              <div className="flex-1">
+                {pickup ? (
+                  <>
+                    <p className="font-bold text-[var(--text-main)]">{pickup.name}</p>
+                    <p className="text-xs text-[var(--text-muted)] font-mono mt-0.5">{pickup.lat?.toFixed(5)}, {pickup.lng?.toFixed(5)}</p>
+                  </>
+                ) : (
+                  <p className="text-[var(--text-main)] font-medium">Select pickup...</p>
+                )}
               </div>
-            )}
+            </button>
           </div>
 
           {/* Dropoff Selection */}
           <div className="space-y-2">
             <label className="text-sm font-bold text-[var(--text-main)] px-1 mt-2 block">Destination Location</label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                <NavIcon className="h-5 w-5 text-[var(--text-muted)]" />
+            <button
+              type="button"
+              onClick={() => setShowDropoffModal(true)}
+              className="w-full flex items-center p-4 bg-[var(--card-bg)] border border-[var(--border-color)] rounded-2xl hover:border-[var(--color-sky)] transition-all text-left"
+            >
+              <div className="w-10 h-10 rounded-full bg-[var(--color-green)]/10 flex items-center justify-center mr-4">
+                <NavIcon className="h-5 w-5 text-[var(--color-green)]" />
               </div>
-              <select
-                required
-                disabled={loadingLocations}
-                value={dropoff}
-                onChange={async (e) => {
-                  const val = e.target.value;
-                  if (val === 'Current Location (GPS)') {
-                    try {
-                      const position = await Geolocation.getCurrentPosition();
-                      setUserLocation({ lat: position.coords.latitude, lng: position.coords.longitude });
-                      setDropoff('Current Location (GPS)');
-                    } catch (error) {
-                      console.error("Location error:", error);
-                      alert("Please enable GPS permissions to use this feature.");
-                      setDropoff('');
-                    }
-                  } else if (val === 'custom') {
-                    Geolocation.getCurrentPosition()
-                      .then(position => setUserLocation({ lat: position.coords.latitude, lng: position.coords.longitude }))
-                      .catch(error => console.error("Background location error:", error));
-                    setDropoff(val);
-                  } else {
-                    setDropoff(val);
-                  }
-                }}
-                className="block w-full pl-12 pr-4 py-4 bg-[var(--card-bg)] border border-[var(--border-color)] rounded-2xl text-[var(--text-main)] font-medium focus:outline-none focus:ring-2 focus:ring-[var(--color-sky)] transition-all appearance-none disabled:opacity-50"
-              >
-                <option value="" disabled>{loadingLocations ? 'Loading addresses...' : 'Select destination...'}</option>
-                <option value="Current Location (GPS)">📍 Use Current Location (GPS)</option>
-                {savedLocations.map((loc, idx) => (
-                  <option key={idx} value={loc.name}>⭐ {loc.name}</option>
-                ))}
-                <option value="custom">+ Type a new address</option>
-              </select>
-            </div>
-            {dropoff === 'custom' && (
-              <div className="mt-2 space-y-2 bg-[var(--bg-page)]/30 p-3 rounded-xl border border-[var(--border-color)]">
-                <div className="pt-2">
-                  <WaveInput 
-                    type="text" 
-                    required
-                    label="Destination Address"
-                    value={customDropoff}
-                    onChange={e => setCustomDropoff(e.target.value)}
-                  />
-                </div>
-                <label className="flex items-center space-x-2 text-sm text-[var(--text-main)] px-1 cursor-pointer pt-2">
-                  <input type="checkbox" checked={saveNewDropoff} onChange={e => setSaveNewDropoff(e.target.checked)} className="rounded text-[var(--color-sky)] focus:ring-[var(--color-sky)] w-4 h-4" />
-                  <span>Save this address for next time</span>
-                </label>
+              <div className="flex-1">
+                {dropoff ? (
+                  <>
+                    <p className="font-bold text-[var(--text-main)]">{dropoff.name}</p>
+                    <p className="text-xs text-[var(--text-muted)] font-mono mt-0.5">{dropoff.lat?.toFixed(5)}, {dropoff.lng?.toFixed(5)}</p>
+                  </>
+                ) : (
+                  <p className="text-[var(--text-main)] font-medium">Select destination...</p>
+                )}
               </div>
-            )}
+            </button>
           </div>
 
           {/* Parcel Description */}
@@ -271,13 +150,28 @@ export function ParcelPickup() {
 
           <button 
             type="submit"
-            className="w-full minimal-button bg-[var(--color-sky)] text-white py-4 mt-4 text-lg shadow-md flex justify-center items-center space-x-2"
+            disabled={!pickup || !dropoff || !parcelDescription}
+            className="w-full minimal-button bg-[var(--color-sky)] text-white py-4 mt-4 text-lg shadow-md flex justify-center items-center space-x-2 disabled:opacity-50"
           >
             <span>Confirm Route</span>
             <Route className="w-5 h-5" />
           </button>
         </form>
       </motion.div>
+
+      <AddressModal 
+        isOpen={showPickupModal}
+        onClose={() => setShowPickupModal(false)}
+        onSelect={setPickup}
+        title="Select Pickup Location"
+      />
+      
+      <AddressModal 
+        isOpen={showDropoffModal}
+        onClose={() => setShowDropoffModal(false)}
+        onSelect={setDropoff}
+        title="Select Destination"
+      />
     </div>
   );
 }
