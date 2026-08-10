@@ -90,7 +90,7 @@ export function ParcelPickup() {
         initial={{ y: '100%' }}
         animate={{ y: 0 }}
         transition={{ type: "spring", damping: 25, stiffness: 200 }}
-        className="glass-panel p-6 pb-40 shrink-0 z-20 rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.1)]"
+        className="glass-panel p-6 pb-48 shrink-0 z-20 rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.1)]"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
           

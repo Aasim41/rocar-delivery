@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { GoogleMap, useJsApiLoader, Marker } from '@react-google-maps/api';
 
-const GOOGLE_MAPS_API_KEY = 'AIzaSyCRBf2b1voiT2blqKtlXZp8z1hSE04Vwmc';
+const GOOGLE_MAPS_API_KEY = 'AIzaSyBX0xNBFK24V2DZgMQHFku3tWcJWtVjgds';
 
 const mapContainerStyle = { width: '100%', height: '100%' };
 

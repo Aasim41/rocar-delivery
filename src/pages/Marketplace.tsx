@@ -176,8 +176,8 @@ export function Marketplace() {
   if (showCheckoutForm) {
     return (
       <motion.div 
-        initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 50 }}
-        className="min-h-screen bg-[var(--bg-page)] flex flex-col font-sans relative overflow-hidden pb-40"
+        initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+        className="fixed inset-0 z-50 bg-[var(--bg-page)] overflow-y-auto pb-48"
       >
         <div className="absolute top-0 right-0 w-96 h-96 bg-[var(--color-sky)] rounded-full opacity-10 blur-[100px] pointer-events-none z-0" />
         
@@ -281,7 +281,7 @@ export function Marketplace() {
         />
 
         {/* Sticky Confirm Button */}
-        <div className="fixed bottom-24 left-0 right-0 px-6 z-40 pointer-events-none">
+        <div className="fixed bottom-28 left-0 right-0 px-6 z-40 pointer-events-none">
           <div className="max-w-xs mx-auto pointer-events-auto">
             <button 
               form="checkout-form"
