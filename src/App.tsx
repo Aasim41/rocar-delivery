@@ -2,14 +2,11 @@ import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
 import { Onboarding } from './pages/Onboarding';
-import { Home } from './pages/Home';
-import { ParcelPickup } from './pages/ParcelPickup';
 import { Marketplace } from './pages/Marketplace';
 import { OrderTracking } from './pages/OrderTracking';
 import { Login } from './pages/Login';
 import { ShopPortal } from './pages/ShopPortal';
 import { Profile } from './pages/Profile';
-import { Navigation } from './components/Navigation';
 import { supabase } from './lib/supabase';
 import { registerPushNotifications, initPushNotificationListeners } from './lib/pushNotifications';
 import { Loader2 } from 'lucide-react';
@@ -169,16 +166,12 @@ function AppRoutes() {
           <Route path="/onboarding" element={<Onboarding onComplete={() => setHasSeenOnboarding(true)} />} />
           <Route path="/login" element={<Login />} />
           <Route path="/shop-portal" element={<ShopPortal />} />
-          <Route path="/" element={<Home />} />
-          <Route path="/parcel-pickup" element={<ParcelPickup />} />
-          <Route path="/marketplace" element={<Marketplace />} />
+          <Route path="/" element={<Marketplace />} />
           <Route path="/tracking/:id" element={<OrderTracking />} />
           <Route path="/profile" element={<Profile />} />
         </Routes>
       </AnimatePresence>
 
-      {/* Navigation only shown for buyers outside of onboarding/login */}
-      {userRole === 'buyer' && location.pathname !== '/onboarding' && location.pathname !== '/login' && <Navigation />}
     </>
   );
 }

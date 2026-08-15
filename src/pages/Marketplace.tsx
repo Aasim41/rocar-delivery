@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ShoppingCart, Plus, Minus, AlertCircle, ArrowLeft, MapPin, Loader2 } from 'lucide-react';
+import { ShoppingCart, Plus, Minus, AlertCircle, ArrowLeft, MapPin, Loader2, User } from 'lucide-react';
 import { motion, AnimatePresence, useInView } from 'framer-motion';
 import { LocationMap } from '../components/LocationMap';
 import { AddressModal } from '../components/AddressModal';
@@ -61,7 +61,9 @@ export function Marketplace() {
   const [cart, setCart] = useState<Record<string, number>>({});
   const [showCheckoutForm, setShowCheckoutForm] = useState(false);
   const [deliveryAddress, setDeliveryAddress] = useState<SavedLocation | null>(null);
+  const [pickupAddress, setPickupAddress] = useState<SavedLocation | null>(null);
   const [showAddressModal, setShowAddressModal] = useState(false);
+  const [addressModalType, setAddressModalType] = useState<'delivery' | 'pickup'>('delivery');
   
   const navigate = useNavigate();
 
@@ -121,7 +123,7 @@ export function Marketplace() {
   const handleCheckoutSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     
-    if (itemCount === 0 || isOverweight || !deliveryAddress) return;
+    if (itemCount === 0 || isOverweight || !deliveryAddress || !pickupAddress) return;
     
     const { data: { session } } = await supabase.auth.getSession();
     
@@ -159,6 +161,25 @@ export function Marketplace() {
     
     const dropLat = deliveryAddress?.lat ?? 24.6380;
     const dropLng = deliveryAddress?.lng ?? 77.3110;
+    
+    // Start location coordinates
+    const startLat = pickupAddress?.lat ?? 24.6355; 
+    const startLng = pickupAddress?.lng ?? 77.3090;
+
+    try {
+        await fetch('http://localhost:8000/backend/coordinates/destinations', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                kart: { latitude: startLat, longitude: startLng, heading: 0 },
+                marketplace: { latitude: startLat, longitude: startLng },
+                delivery_point: { latitude: dropLat, longitude: dropLng }
+            })
+        });
+    } catch (err) {
+        console.error("Failed to update Python Backend Route", err);
+    }
+
     navigate(`/tracking/${orderId}?type=marketplace&dropLat=${dropLat}&dropLng=${dropLng}`);
   };
 
@@ -238,7 +259,33 @@ export function Marketplace() {
             <form id="checkout-form" onSubmit={handleCheckoutSubmit} className="space-y-4">
               <button
                 type="button"
-                onClick={() => setShowAddressModal(true)}
+                onClick={() => {
+                  setAddressModalType('pickup');
+                  setShowAddressModal(true);
+                }}
+                className="w-full flex items-center p-4 bg-[var(--bg-page)]/50 border border-[var(--border-color)] rounded-2xl hover:border-[var(--color-sky)] transition-all text-left"
+              >
+                <div className="w-10 h-10 rounded-full bg-[var(--color-sky)]/10 flex items-center justify-center mr-4">
+                  <MapPin className="h-5 w-5 text-[var(--color-sky)]" />
+                </div>
+                <div className="flex-1">
+                  {pickupAddress ? (
+                    <>
+                      <p className="font-bold text-[var(--text-main)]">{pickupAddress.name} (Start)</p>
+                      <p className="text-xs text-[var(--text-muted)] font-mono mt-0.5">{pickupAddress.lat?.toFixed(5)}, {pickupAddress.lng?.toFixed(5)}</p>
+                    </>
+                  ) : (
+                    <p className="text-[var(--text-main)] font-medium">Select start location...</p>
+                  )}
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setAddressModalType('delivery');
+                  setShowAddressModal(true);
+                }}
                 className="w-full flex items-center p-4 bg-[var(--bg-page)]/50 border border-[var(--border-color)] rounded-2xl hover:border-[var(--color-sky)] transition-all text-left"
               >
                 <div className="w-10 h-10 rounded-full bg-[var(--color-sky)]/10 flex items-center justify-center mr-4">
@@ -247,7 +294,7 @@ export function Marketplace() {
                 <div className="flex-1">
                   {deliveryAddress ? (
                     <>
-                      <p className="font-bold text-[var(--text-main)]">{deliveryAddress.name}</p>
+                      <p className="font-bold text-[var(--text-main)]">{deliveryAddress.name} (Destination)</p>
                       <p className="text-xs text-[var(--text-muted)] font-mono mt-0.5">{deliveryAddress.lat?.toFixed(5)}, {deliveryAddress.lng?.toFixed(5)}</p>
                     </>
                   ) : (
@@ -257,14 +304,18 @@ export function Marketplace() {
               </button>
 
               {/* Map Preview */}
-              {deliveryAddress && deliveryAddress.lat !== undefined && deliveryAddress.lng !== undefined && (
+              {((pickupAddress && pickupAddress.lat !== undefined) || (deliveryAddress && deliveryAddress.lat !== undefined)) && (
                 <div className="h-40 mt-4 rounded-xl overflow-hidden shadow-inner border border-[var(--border-color)]">
                   <LocationMap 
                     locations={[
-                      { 
+                      ...(pickupAddress && pickupAddress.lat !== undefined ? [{ 
+                        address: `GPS: ${pickupAddress.lat}, ${pickupAddress.lng}`, 
+                        label: pickupAddress.name + " (Start)"
+                      }] : []),
+                      ...(deliveryAddress && deliveryAddress.lat !== undefined ? [{ 
                         address: `GPS: ${deliveryAddress.lat}, ${deliveryAddress.lng}`, 
-                        label: deliveryAddress.name
-                      }
+                        label: deliveryAddress.name + " (End)"
+                      }] : [])
                     ]} 
                   />
                 </div>
@@ -276,8 +327,8 @@ export function Marketplace() {
         <AddressModal 
           isOpen={showAddressModal}
           onClose={() => setShowAddressModal(false)}
-          onSelect={setDeliveryAddress}
-          title="Select Destination"
+          onSelect={addressModalType === 'delivery' ? setDeliveryAddress : setPickupAddress}
+          title={addressModalType === 'delivery' ? "Select Destination" : "Select Start Point"}
         />
 
         {/* Sticky Confirm Button */}
@@ -286,7 +337,7 @@ export function Marketplace() {
             <button 
               form="checkout-form"
               type="submit"
-              disabled={!deliveryAddress}
+              disabled={!deliveryAddress || !pickupAddress}
               className="w-full minimal-button bg-[var(--color-green)] text-white text-base py-3.5 flex justify-between items-center px-5 disabled:opacity-50 shadow-xl hover:shadow-2xl transition-shadow"
             >
               <span className="font-bold">Place Order</span>
@@ -307,11 +358,19 @@ export function Marketplace() {
       <div className="absolute top-[50%] left-[-10%] w-80 h-80 bg-[var(--color-sky)] rounded-full opacity-10 blur-[100px] pointer-events-none z-0" />
 
       <header className="px-6 py-4 glass-panel sticky top-0 z-40 shadow-sm mb-8 rounded-b-3xl mx-2 mt-2">
-        <div className="flex items-center space-x-3 mb-4">
-          <button onClick={() => navigate(-1)} className="p-2 -ml-2 rounded-full hover:bg-[var(--border-color)] text-[var(--text-main)] transition-colors">
-            <ArrowLeft className="w-6 h-6" />
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center space-x-3">
+            <button onClick={() => navigate(-1)} className="p-2 -ml-2 rounded-full hover:bg-[var(--border-color)] text-[var(--text-main)] transition-colors">
+              <ArrowLeft className="w-6 h-6" />
+            </button>
+            <h1 className="text-2xl font-bold text-[var(--text-main)] tracking-tight">Marketplace</h1>
+          </div>
+          <button 
+            onClick={() => navigate('/profile')}
+            className="w-10 h-10 rounded-full bg-[var(--color-sky)]/10 flex items-center justify-center border border-[var(--color-sky)]/20 hover:bg-[var(--color-sky)]/20 transition-colors"
+          >
+            <User className="w-5 h-5 text-[var(--color-sky)]" />
           </button>
-          <h1 className="text-2xl font-bold text-[var(--text-main)] tracking-tight">Marketplace</h1>
         </div>
         
         <div className="flex justify-between text-xs font-semibold uppercase tracking-wider mb-2 text-[var(--text-muted)]">
