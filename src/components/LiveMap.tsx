@@ -54,9 +54,6 @@ export function LiveMap({ startLat, startLng, dropLat, dropLng, currentLat, curr
     googleMapsApiKey: GOOGLE_MAPS_API_KEY,
   });
 
-  // directions is used for fetching the route path but not rendered directly
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [directions, setDirections] = useState<google.maps.DirectionsResult | null>(null);
   const [routePath, setRoutePath] = useState<{lat: number; lng: number}[]>([]);
 
   useEffect(() => {
@@ -70,7 +67,6 @@ export function LiveMap({ startLat, startLng, dropLat, dropLng, currentLat, curr
       },
       (result, status) => {
         if (status === google.maps.DirectionsStatus.OK && result) {
-          setDirections(result);
           // Extract points for robot animation
           const path = result.routes[0].overview_path.map(p => ({ lat: p.lat(), lng: p.lng() }));
           setRoutePath(path);
