@@ -287,10 +287,10 @@ export function Marketplace() {
                   setAddressModalType('delivery');
                   setShowAddressModal(true);
                 }}
-                className="w-full flex items-center p-4 bg-[var(--bg-page)]/50 border border-[var(--border-color)] rounded-2xl hover:border-[var(--color-sky)] transition-all text-left"
+                className="w-full flex items-center p-4 bg-[var(--bg-page)]/50 border border-[var(--border-color)] rounded-2xl hover:border-[var(--color-green)] transition-all text-left"
               >
-                <div className="w-10 h-10 rounded-full bg-[var(--color-sky)]/10 flex items-center justify-center mr-4">
-                  <MapPin className="h-5 w-5 text-[var(--color-sky)]" />
+                <div className="w-10 h-10 rounded-full bg-[var(--color-green)]/10 flex items-center justify-center mr-4">
+                  <MapPin className="h-5 w-5 text-[var(--color-green)]" />
                 </div>
                 <div className="flex-1">
                   {deliveryAddress ? (

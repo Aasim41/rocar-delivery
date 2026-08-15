@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { GoogleMap, useJsApiLoader, Marker, Polyline } from '@react-google-maps/api';
 
 const GOOGLE_MAPS_API_KEY = 'AIzaSyBX0xNBFK24V2DZgMQHFku3tWcJWtVjgds';
@@ -31,32 +31,7 @@ function useIsDark() {
   return isDark;
 }
 
-// Generate a gentle curve between two points
-function generateCurvedPath(
-  start: { lat: number; lng: number },
-  end: { lat: number; lng: number },
-  numPoints = 30
-): { lat: number; lng: number }[] {
-  const points: { lat: number; lng: number }[] = [];
-  const midLat = (start.lat + end.lat) / 2;
-  const midLng = (start.lng + end.lng) / 2;
-  
-  const dx = end.lng - start.lng;
-  const dy = end.lat - start.lat;
-  const dist = Math.sqrt(dx * dx + dy * dy);
-  const offset = dist * 0.15;
-  
-  const controlLat = midLat + (-dx / dist) * offset;
-  const controlLng = midLng + (dy / dist) * offset;
-  
-  for (let i = 0; i <= numPoints; i++) {
-    const t = i / numPoints;
-    const lat = (1 - t) * (1 - t) * start.lat + 2 * (1 - t) * t * controlLat + t * t * end.lat;
-    const lng = (1 - t) * (1 - t) * start.lng + 2 * (1 - t) * t * controlLng + t * t * end.lng;
-    points.push({ lat, lng });
-  }
-  return points;
-}
+// generateCurvedPath removed in favor of DirectionsService
 
 interface LiveMapProps {
   startLat: number;
@@ -79,30 +54,52 @@ export function LiveMap({ startLat, startLng, dropLat, dropLng, currentLat, curr
     googleMapsApiKey: GOOGLE_MAPS_API_KEY,
   });
 
-  const curvedPath = useMemo(() => generateCurvedPath(
-    { lat: startLat, lng: startLng },
-    { lat: dropLat, lng: dropLng }
-  ), [startLat, startLng, dropLat, dropLng]);
+  // directions is used for fetching the route path but not rendered directly
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [directions, setDirections] = useState<google.maps.DirectionsResult | null>(null);
+  const [routePath, setRoutePath] = useState<{lat: number; lng: number}[]>([]);
 
-  // Simulate movement along the curved path
+  useEffect(() => {
+    if (!isLoaded) return;
+    const directionsService = new google.maps.DirectionsService();
+    directionsService.route(
+      {
+        origin: { lat: startLat, lng: startLng },
+        destination: { lat: dropLat, lng: dropLng },
+        travelMode: google.maps.TravelMode.DRIVING,
+      },
+      (result, status) => {
+        if (status === google.maps.DirectionsStatus.OK && result) {
+          setDirections(result);
+          // Extract points for robot animation
+          const path = result.routes[0].overview_path.map(p => ({ lat: p.lat(), lng: p.lng() }));
+          setRoutePath(path);
+        }
+      }
+    );
+  }, [isLoaded, startLat, startLng, dropLat, dropLng]);
+
+  // Simulate movement along the road path
   useEffect(() => {
     if (currentLat && currentLng) {
       setRobotPos({ lat: currentLat, lng: currentLng });
       return;
     }
 
+    if (routePath.length === 0) return;
+
     let step = 0;
     const interval = setInterval(() => {
       step += 1;
-      if (step >= curvedPath.length) {
-        step = curvedPath.length - 1;
+      if (step >= routePath.length) {
+        step = routePath.length - 1;
         clearInterval(interval);
       }
-      setRobotPos(curvedPath[step]);
-    }, 1000);
+      setRobotPos(routePath[step]);
+    }, 1500);
 
     return () => clearInterval(interval);
-  }, [startLat, startLng, dropLat, dropLng, currentLat, currentLng]);
+  }, [routePath, currentLat, currentLng]);
 
   const onLoad = useCallback(
     (map: google.maps.Map) => {
@@ -182,9 +179,9 @@ export function LiveMap({ startLat, startLng, dropLat, dropLng, currentLat, curr
         onLoad={onLoad}
         options={mapOptions}
       >
-        {/* Curved Route - Glow layer */}
+        {/* Road Route - Glow layer */}
         <Polyline
-          path={curvedPath}
+          path={routePath}
           options={{
             strokeColor: '#6366f1',
             strokeWeight: 6,
@@ -192,9 +189,9 @@ export function LiveMap({ startLat, startLng, dropLat, dropLng, currentLat, curr
           }}
         />
 
-        {/* Curved Route - Main dashed line */}
+        {/* Road Route - Main dashed line */}
         <Polyline
-          path={curvedPath}
+          path={routePath}
           options={{
             strokeColor: '#6366f1',
             strokeWeight: 3,
