@@ -118,19 +118,36 @@ export function OrderTracking() {
     }
   }, [currentStatus]);
 
-  const handleUnlock = (e: React.FormEvent) => {
+  const handleUnlock = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setUnlocking(true);
     
-    setTimeout(() => {
+    try {
       if (otp === expectedOtp) {
-        setIsUnlocked(true);
+        // Send the unlock command to the Python Cart API
+        const response = await fetch('http://localhost:8000/control', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ action: 'unlock' }),
+        });
+
+        if (response.ok) {
+          setIsUnlocked(true);
+        } else {
+          setError('Failed to connect to cart.');
+        }
       } else {
         setError('Incorrect PIN');
       }
+    } catch (err) {
+      console.error(err);
+      setError('Network error to cart.');
+    } finally {
       setUnlocking(false);
-    }, 800);
+    }
   };
 
   const formatETA = (seconds: number) => {
