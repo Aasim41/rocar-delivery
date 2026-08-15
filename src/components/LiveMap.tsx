@@ -68,8 +68,28 @@ export function LiveMap({ startLat, startLng, dropLat, dropLng, currentLat, curr
       (result, status) => {
         if (status === google.maps.DirectionsStatus.OK && result) {
           // Extract points for robot animation
-          const path = result.routes[0].overview_path.map(p => ({ lat: p.lat(), lng: p.lng() }));
-          setRoutePath(path);
+          const rawPath = result.routes[0].overview_path.map(p => ({ lat: p.lat(), lng: p.lng() }));
+          
+          // Interpolate path for smooth 1-second animation steps
+          const interpolatedPath = [];
+          if (rawPath.length > 0) {
+            for (let i = 0; i < rawPath.length - 1; i++) {
+              const p1 = rawPath[i];
+              const p2 = rawPath[i+1];
+              // Rough distance scalar (0.01 roughly equals 1km)
+              const dist = Math.sqrt(Math.pow(p2.lat - p1.lat, 2) + Math.pow(p2.lng - p1.lng, 2));
+              // Generate steps (e.g., 50 steps per km)
+              const steps = Math.max(1, Math.floor(dist * 6000)); 
+              for (let j = 0; j < steps; j++) {
+                interpolatedPath.push({
+                  lat: p1.lat + (p2.lat - p1.lat) * (j / steps),
+                  lng: p1.lng + (p2.lng - p1.lng) * (j / steps)
+                });
+              }
+            }
+            interpolatedPath.push(rawPath[rawPath.length - 1]);
+          }
+          setRoutePath(interpolatedPath);
         } else {
           // Fallback if Directions API fails (e.g. no billing enabled)
           console.warn("Directions API failed, using fallback straight-line path.");
@@ -113,7 +133,7 @@ export function LiveMap({ startLat, startLng, dropLat, dropLng, currentLat, curr
         body: JSON.stringify({ latitude: pos.lat, longitude: pos.lng })
       }).catch(err => console.log("Dash map link failed:", err));
       
-    }, 1500);
+    }, 1000); // Move every 1 second
 
     return () => clearInterval(interval);
   }, [routePath, currentLat, currentLng]);
