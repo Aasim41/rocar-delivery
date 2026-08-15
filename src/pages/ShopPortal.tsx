@@ -109,10 +109,7 @@ export function ShopPortal() {
       // 2. Trigger Python Backend
       const backendUrl = localStorage.getItem('BACKEND_URL') || 'http://localhost:8000';
       const res = await fetch(`${backendUrl}/backend/pack_order`, {
-        method: 'POST',
-        headers: {
-          'Bypass-Tunnel-Reminder': 'true'
-        }
+        method: 'POST'
       });
       
       if (!res.ok) {

@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/proxy/:path*",
+      "destination": "https://grumpy-bears-fly.loca.lt/:path*"
+    }
+  ]
+}

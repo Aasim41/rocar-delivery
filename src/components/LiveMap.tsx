@@ -70,6 +70,18 @@ export function LiveMap({ startLat, startLng, dropLat, dropLng, currentLat, curr
           // Extract points for robot animation
           const path = result.routes[0].overview_path.map(p => ({ lat: p.lat(), lng: p.lng() }));
           setRoutePath(path);
+        } else {
+          // Fallback if Directions API fails (e.g. no billing enabled)
+          console.warn("Directions API failed, using fallback straight-line path.");
+          const fallbackPath = [];
+          for (let i = 0; i <= 30; i++) {
+            const t = i / 30;
+            fallbackPath.push({
+              lat: startLat + (dropLat - startLat) * t,
+              lng: startLng + (dropLng - startLng) * t
+            });
+          }
+          setRoutePath(fallbackPath);
         }
       }
     );
