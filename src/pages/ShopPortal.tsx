@@ -8,8 +8,10 @@ import { WaveInput } from '../components/WaveInput';
 
 export function ShopPortal() {
   const [inventory, setInventory] = useState<any[]>([]);
+  const [orders, setOrders] = useState<any[]>([]);
   const [showAddForm, setShowAddForm] = useState(false);
   const [newItem, setNewItem] = useState({ name: '', category: 'Medicines', weight: 0, price: 0, quantity: 0 });
+  const [activeTab, setActiveTab] = useState<'inventory' | 'orders'>('orders');
 
   useEffect(() => {
     fetchInventory();
@@ -18,6 +20,20 @@ export function ShopPortal() {
   const fetchInventory = async () => {
     const { data } = await supabase.from('items').select('*').order('name');
     if (data) setInventory(data);
+    
+    // Also fetch active orders
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) {
+      const { data: userData } = await supabase.from('users').select('shop_id').eq('id', session.user.id).single();
+      if (userData?.shop_id) {
+        const { data: ordersData } = await supabase.from('orders')
+          .select('*')
+          .eq('shop_id', userData.shop_id)
+          .eq('status', 'dispatched')
+          .order('created_at', { ascending: false });
+        if (ordersData) setOrders(ordersData);
+      }
+    }
   };
 
   const handleLogout = async () => {
@@ -85,6 +101,29 @@ export function ShopPortal() {
     setNewItem({ name: '', category: 'Medicines', weight: 0, price: 0, quantity: 0 });
   };
 
+  const handlePackOrder = async (orderId: string) => {
+    try {
+      // 1. Mark in Supabase
+      await supabase.from('orders').update({ status: 'packed' }).eq('id', orderId);
+      
+      // 2. Trigger Python Backend
+      const res = await fetch('http://localhost:8000/backend/pack_order', {
+        method: 'POST'
+      });
+      
+      if (!res.ok) {
+         console.warn("Backend might not be awaiting packing or offline");
+      }
+      
+      // 3. Remove from UI
+      setOrders(prev => prev.filter(o => o.id !== orderId));
+      alert("Order Packed! Cargo locked and bot is starting its journey to the customer.");
+    } catch (e) {
+      console.error(e);
+      alert("Error packing order.");
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 pb-24 font-sans">
       <header className="bg-white border-b border-slate-200 px-6 py-4 sticky top-0 z-20 flex justify-between items-center shadow-sm">
@@ -101,16 +140,33 @@ export function ShopPortal() {
       </header>
 
       <main className="p-6 max-w-3xl mx-auto">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-lg font-semibold text-slate-800">Inventory Management</h2>
+        <div className="flex space-x-4 mb-6">
           <button 
-            onClick={() => setShowAddForm(!showAddForm)}
-            className="flex items-center space-x-2 bg-emerald-600 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-emerald-700 transition-colors shadow-sm"
+            onClick={() => setActiveTab('orders')}
+            className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${activeTab === 'orders' ? 'bg-slate-900 text-white shadow-md' : 'bg-slate-200 text-slate-600 hover:bg-slate-300'}`}
           >
-            <Plus className="w-4 h-4" />
-            <span>Add Item</span>
+            Incoming Orders ({orders.length})
+          </button>
+          <button 
+            onClick={() => setActiveTab('inventory')}
+            className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${activeTab === 'inventory' ? 'bg-slate-900 text-white shadow-md' : 'bg-slate-200 text-slate-600 hover:bg-slate-300'}`}
+          >
+            Inventory
           </button>
         </div>
+
+        {activeTab === 'inventory' ? (
+          <>
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-lg font-semibold text-slate-800">Inventory Management</h2>
+              <button 
+                onClick={() => setShowAddForm(!showAddForm)}
+                className="flex items-center space-x-2 bg-emerald-600 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-emerald-700 transition-colors shadow-sm"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Add Item</span>
+              </button>
+            </div>
 
         <AnimatePresence>
           {showAddForm && (
@@ -215,6 +271,51 @@ export function ShopPortal() {
             </div>
           )}
         </div>
+        </>
+        ) : (
+          <div className="space-y-4">
+            {orders.length === 0 ? (
+              <div className="p-12 text-center bg-white rounded-2xl shadow-sm border border-slate-200">
+                <PackageSearch className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+                <h3 className="text-lg font-bold text-slate-900">No active orders</h3>
+                <p className="text-slate-500 mt-1">When customers place orders, they will appear here for packing.</p>
+              </div>
+            ) : (
+              orders.map(order => (
+                <div key={order.id} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                  <div className="flex justify-between items-start mb-4">
+                    <div>
+                      <h3 className="font-bold text-slate-900 text-lg">Order #{order.id.slice(0, 8)}</h3>
+                      <p className="text-sm text-slate-500">Weight: {order.total_weight_grams}g</p>
+                    </div>
+                    <span className="bg-amber-100 text-amber-800 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wide">
+                      Awaiting Pack
+                    </span>
+                  </div>
+                  
+                  <div className="bg-slate-50 rounded-xl p-4 mb-4 border border-slate-100">
+                    <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Items to pack</h4>
+                    <ul className="space-y-2">
+                      {order.items?.map((item: any, idx: number) => (
+                        <li key={idx} className="flex justify-between text-sm">
+                          <span className="font-medium text-slate-800">{item.qty}x {item.name}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  <button 
+                    onClick={() => handlePackOrder(order.id)}
+                    className="w-full bg-slate-900 hover:bg-black text-white font-bold py-3.5 rounded-xl shadow-lg transition-all active:scale-[0.98] flex items-center justify-center space-x-2"
+                  >
+                    <PackageSearch className="w-5 h-5" />
+                    <span>Mark as Packed & Dispatch Bot</span>
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+        )}
       </main>
     </div>
   );
