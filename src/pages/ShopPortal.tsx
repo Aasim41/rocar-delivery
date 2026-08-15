@@ -107,7 +107,8 @@ export function ShopPortal() {
       await supabase.from('orders').update({ status: 'packed' }).eq('id', orderId);
       
       // 2. Trigger Python Backend
-      const res = await fetch('http://localhost:8000/backend/pack_order', {
+      const backendUrl = localStorage.getItem('BACKEND_URL') || 'http://localhost:8000';
+      const res = await fetch(`${backendUrl}/backend/pack_order`, {
         method: 'POST'
       });
       

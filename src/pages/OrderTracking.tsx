@@ -125,8 +125,9 @@ export function OrderTracking() {
     
     try {
       if (otp === expectedOtp) {
+        const backendUrl = localStorage.getItem('BACKEND_URL') || 'http://localhost:8000';
         // Send the unlock command to the Python Cart API
-        const response = await fetch('http://localhost:8000/control', {
+        const response = await fetch(`${backendUrl}/control`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

@@ -167,7 +167,8 @@ export function Marketplace() {
     const startLng = pickupAddress?.lng ?? 77.3090;
 
     try {
-        await fetch('http://localhost:8000/backend/coordinates/destinations', {
+        const backendUrl = localStorage.getItem('BACKEND_URL') || 'http://localhost:8000';
+        await fetch(`${backendUrl}/backend/coordinates/destinations`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -180,7 +181,7 @@ export function Marketplace() {
         console.error("Failed to update Python Backend Route", err);
     }
 
-    navigate(`/tracking/${orderId}?type=marketplace&dropLat=${dropLat}&dropLng=${dropLng}`);
+    navigate(`/tracking/${orderId}?type=marketplace&startLat=${startLat}&startLng=${startLng}&dropLat=${dropLat}&dropLng=${dropLng}`);
   };
 
   // Ensure consistent category names as requested

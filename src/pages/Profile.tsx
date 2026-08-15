@@ -20,6 +20,9 @@ export function Profile() {
   const [editingAddressIdx, setEditingAddressIdx] = useState<number | null>(null);
   const [editAddressName, setEditAddressName] = useState('');
 
+  // Developer settings
+  const [backendUrl, setBackendUrl] = useState(localStorage.getItem('BACKEND_URL') || 'http://localhost:8000');
+
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -98,6 +101,11 @@ export function Profile() {
       setIsDarkMode(true);
       localStorage.setItem('theme', 'dark');
     }
+  };
+
+  const saveBackendUrl = (url: string) => {
+    setBackendUrl(url);
+    localStorage.setItem('BACKEND_URL', url);
   };
 
   if (loading) {
@@ -272,26 +280,44 @@ export function Profile() {
         </h3>
         <div className="glass-card p-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="bg-[var(--color-sky)]/10 p-2 rounded-xl">
-                {isDarkMode ? <Moon className="w-5 h-5 text-[var(--color-sky)]" /> : <Sun className="w-5 h-5 text-[var(--color-yellow)]" />}
-              </div>
-              <div>
-                <p className="font-semibold text-[var(--text-main)]">Dark Mode</p>
-                <p className="text-xs text-[var(--text-muted)] font-medium">Toggle app theme</p>
-              </div>
+          <div className="flex items-center space-x-3">
+            <div className="p-2 bg-[var(--color-sky)]/10 rounded-lg text-[var(--color-sky)]">
+              {isDarkMode ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
             </div>
-            <button 
-              onClick={toggleTheme}
-              className={`w-12 h-6 rounded-full transition-colors flex items-center px-1 ${isDarkMode ? 'bg-[var(--color-sky)]' : 'bg-[var(--border-color)]'}`}
-            >
-              <motion.div 
-                animate={{ x: isDarkMode ? 24 : 0 }}
-                className="w-4 h-4 rounded-full bg-white shadow-sm"
-              />
-            </button>
+            <div>
+              <p className="font-semibold text-[var(--text-main)]">Dark Mode</p>
+              <p className="text-xs text-[var(--text-muted)]">Toggle application theme</p>
+            </div>
           </div>
+          <button 
+            onClick={toggleTheme}
+            className={`w-12 h-6 rounded-full transition-colors relative ${isDarkMode ? 'bg-[var(--color-sky)]' : 'bg-slate-300 dark:bg-slate-700'}`}
+          >
+            <div className={`w-4 h-4 bg-white rounded-full absolute top-1 transition-transform ${isDarkMode ? 'left-7' : 'left-1'}`} />
+          </button>
         </div>
+      </div>
+
+      {/* Developer Settings */}
+      <div className="glass-card p-6 mb-8 relative z-10">
+        <div className="flex items-center space-x-2 mb-4">
+          <Settings className="w-5 h-5 text-slate-500" />
+          <h2 className="font-bold text-[var(--text-main)] text-lg">Developer Settings</h2>
+        </div>
+        <div className="space-y-2">
+          <label className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">Backend API URL</label>
+          <div className="flex space-x-2">
+            <input 
+              type="text" 
+              value={backendUrl}
+              onChange={(e) => saveBackendUrl(e.target.value)}
+              className="flex-1 bg-[var(--bg-page)] border border-[var(--border-color)] px-3 py-2 rounded-lg text-sm text-[var(--text-main)] focus:outline-none focus:border-[var(--color-sky)]"
+              placeholder="http://localhost:8000"
+            />
+          </div>
+          <p className="text-xs text-[var(--text-muted)]">Use your LocalTunnel URL if accessing from a phone (e.g. https://my-bot.loca.lt).</p>
+        </div>
+      </div>
       </div>
 
       {/* Logout */}
