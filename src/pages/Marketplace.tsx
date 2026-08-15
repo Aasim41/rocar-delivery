@@ -170,7 +170,10 @@ export function Marketplace() {
         const backendUrl = localStorage.getItem('BACKEND_URL') || 'http://localhost:8000';
         await fetch(`${backendUrl}/backend/coordinates/destinations`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+              'Content-Type': 'application/json',
+              'Bypass-Tunnel-Reminder': 'true'
+            },
             body: JSON.stringify({
                 kart: { latitude: startLat, longitude: startLng, heading: 0 },
                 marketplace: { latitude: startLat, longitude: startLng },
