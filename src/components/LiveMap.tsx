@@ -73,13 +73,14 @@ export function LiveMap({ startLat, startLng, dropLat, dropLng, currentLat, curr
           // Interpolate path for smooth 1-second animation steps
           const interpolatedPath = [];
           if (rawPath.length > 0) {
+            // Dramatically speed up for demo purposes! 
+            // We want the whole trip to take ~15-20 seconds
             for (let i = 0; i < rawPath.length - 1; i++) {
               const p1 = rawPath[i];
               const p2 = rawPath[i+1];
-              // Rough distance scalar (0.01 roughly equals 1km)
               const dist = Math.sqrt(Math.pow(p2.lat - p1.lat, 2) + Math.pow(p2.lng - p1.lng, 2));
-              // Generate steps (e.g., 50 steps per km)
-              const steps = Math.max(1, Math.floor(dist * 6000)); 
+              // Only 200 steps per degree (very fast) instead of 6000
+              const steps = Math.max(1, Math.floor(dist * 200)); 
               for (let j = 0; j < steps; j++) {
                 interpolatedPath.push({
                   lat: p1.lat + (p2.lat - p1.lat) * (j / steps),
