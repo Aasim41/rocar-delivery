@@ -67,10 +67,18 @@ export function LiveMap({ startLat, startLng, dropLat, dropLng, currentLat, curr
       },
       (result, status) => {
         if (status === google.maps.DirectionsStatus.OK && result) {
-          // Extract points for robot animation
-          const rawPath = result.routes[0].overview_path.map(p => ({ lat: p.lat(), lng: p.lng() }));
+          // Use high-resolution step paths instead of the low-res overview_path
+          // so the route and bot perfectly snap to the physical road curves
+          const rawPath: {lat: number, lng: number}[] = [];
+          if (result.routes[0].legs && result.routes[0].legs.length > 0) {
+            result.routes[0].legs[0].steps.forEach((step: any) => {
+              step.path.forEach((p: any) => {
+                rawPath.push({ lat: p.lat(), lng: p.lng() });
+              });
+            });
+          }
           
-          // Interpolate path for smooth 1-second animation steps
+          // Interpolate path for smooth animation steps
           const interpolatedPath = [];
           if (rawPath.length > 0) {
             // Dramatically speed up for demo purposes! 
