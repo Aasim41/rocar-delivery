@@ -103,7 +103,16 @@ export function LiveMap({ startLat, startLng, dropLat, dropLng, currentLat, curr
         step = routePath.length - 1;
         clearInterval(interval);
       }
-      setRobotPos(routePath[step]);
+      const pos = routePath[step];
+      setRobotPos(pos);
+      
+      // Push live location to python backend to link with Streamlit dash
+      const backendUrl = localStorage.getItem('BACKEND_URL') || 'http://localhost:8000';
+      fetch(`${backendUrl}/backend/coordinates/live`, {
+        method: 'POST',
+        body: JSON.stringify({ latitude: pos.lat, longitude: pos.lng })
+      }).catch(err => console.log("Dash map link failed:", err));
+      
     }, 1500);
 
     return () => clearInterval(interval);
