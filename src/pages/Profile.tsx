@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { User, MapPin, Package, LogOut, Loader2, Edit2, Check, Clock, Moon, Sun, Settings, Trash2 } from 'lucide-react';
+import { User, MapPin, Package, LogOut, Loader2, Edit2, Check, Clock, Moon, Sun, Settings, Trash2, ArrowLeft } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 
@@ -103,9 +103,9 @@ export function Profile() {
     }
   };
 
-  const saveBackendUrl = (url: string) => {
-    setBackendUrl(url);
-    localStorage.setItem('BACKEND_URL', url);
+  const saveBackendUrl = () => {
+    localStorage.setItem('BACKEND_URL', backendUrl);
+    // Visual feedback could be added here, but saving is immediate
   };
 
   if (loading) {
@@ -125,7 +125,13 @@ export function Profile() {
     >
       <div className="absolute top-[-10%] right-[-10%] w-64 h-64 bg-[var(--color-sky)] rounded-full opacity-10 blur-[80px] pointer-events-none z-0" />
 
-      <header className="mb-8 mt-6 relative z-10">
+      <header className="mb-8 mt-6 relative z-10 flex items-center">
+        <button 
+          onClick={() => navigate(-1)} 
+          className="p-2 mr-3 bg-[var(--bg-page)]/50 border border-[var(--border-color)] rounded-full text-[var(--text-main)] hover:bg-[var(--border-color)] transition-colors"
+        >
+          <ArrowLeft className="w-5 h-5" />
+        </button>
         <h1 className="text-3xl font-extrabold text-[var(--text-main)] tracking-tight">Profile</h1>
       </header>
 
@@ -310,10 +316,16 @@ export function Profile() {
             <input 
               type="text" 
               value={backendUrl}
-              onChange={(e) => saveBackendUrl(e.target.value)}
+              onChange={(e) => setBackendUrl(e.target.value)}
               className="flex-1 bg-[var(--bg-page)] border border-[var(--border-color)] px-3 py-2 rounded-lg text-sm text-[var(--text-main)] focus:outline-none focus:border-[var(--color-sky)]"
               placeholder="http://localhost:8000"
             />
+            <button 
+              onClick={saveBackendUrl}
+              className="px-4 py-2 bg-[var(--color-sky)] text-white font-bold rounded-lg text-sm hover:opacity-90 transition-opacity"
+            >
+              Save
+            </button>
           </div>
           <p className="text-xs text-[var(--text-muted)]">Use your LocalTunnel URL if accessing from a phone (e.g. https://my-bot.loca.lt).</p>
         </div>
