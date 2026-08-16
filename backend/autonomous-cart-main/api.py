@@ -1,7 +1,10 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
 from navigation.movement import movement
-from map_navigation import pipeline 
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), 'navigation'))
+from navigation.pipeline import pipeline
 
 
 app = FastAPI()
@@ -24,7 +27,7 @@ class GeneralRequest(BaseModel):
     open_kart: int
     closed_kart: int
 # Create routes
-@app.get("/backend/coordinates/destinations")
+@app.post("/backend/coordinates/destinations")
 def get_coordinates(data: RoutesRequest, Data : KartCoordinates):
     marketplace = data.marketplace
     kart = data.kart

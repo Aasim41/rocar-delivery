@@ -27,7 +27,7 @@ function CatalogItem({ item, cart, updateCart }: any) {
             <h3 className="font-bold text-[var(--text-main)] text-lg tracking-tight">{item.name}</h3>
             {!item.in_stock && <span className="text-[10px] uppercase tracking-wider font-semibold bg-[var(--text-muted)]/20 text-[var(--text-muted)] px-2 py-0.5 rounded-md">Out of Stock</span>}
           </div>
-          <p className="text-[var(--text-muted)] font-medium mt-1 text-sm bg-[var(--color-sky)]/10 inline-block px-2 py-0.5 rounded-md text-[var(--color-sky)]">${item.price.toFixed(2)} • {item.weight}g</p>
+          <p className="text-[var(--text-muted)] font-medium mt-1 text-sm bg-[var(--color-sky)]/10 inline-block px-2 py-0.5 rounded-md text-[var(--color-sky)]">₹{item.price.toFixed(2)} • {item.weight}g</p>
         </div>
         
         <div className="flex items-center space-x-3 bg-[var(--bg-page)]/50 rounded-2xl p-1.5 border border-[var(--border-color)] ml-4">
@@ -119,54 +119,68 @@ export function ShopPage() {
 
   const filteredCatalog = catalog.filter(i => i.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
-  const handleCheckoutSubmit = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (itemCount === 0 || isOverweight || !deliveryAddress || !shop) return;
-    
-    const { data: { session } } = await supabase.auth.getSession();
-    let orderId = Math.random().toString(36).substring(7);
-    
-    const orderData = {
-      user_id: (session && session.user.id !== 'demo-user-123') ? session.user.id : null,
-      shop_id: shop.id,
-      status: 'at_pickup',
-      total_weight_grams: cartTotalWeight,
-      items: Object.entries(cart).map(([id, qty]) => {
-        const item = catalog.find(i => i.id === id);
-        return { id, name: item?.name, qty, price: item?.price };
-      })
-    };
-
-    const { data, error } = await supabase.from('orders').insert([orderData]).select().single();
-    if (data && !error) {
-      orderId = data.id;
-    } else {
-      alert("Order failed: " + (error?.message || "Unknown error"));
-      return;
-    }
-    
-    const dropLat = deliveryAddress.lat ?? 24.6380;
-    const dropLng = deliveryAddress.lng ?? 77.3110;
-    const startLat = shop.lat; 
-    const startLng = shop.lng;
-
+  const handleCheckoutSubmit = async (e?: React.FormEvent | React.MouseEvent) => {
     try {
-        const backendUrl = localStorage.getItem('BACKEND_URL') || 'http://localhost:8000';
-        await fetch(`${backendUrl}/backend/coordinates/destinations`, {
-            method: 'POST',
-            body: JSON.stringify({
-                kart: { latitude: startLat, longitude: startLng, heading: 0 },
-                marketplace: { latitude: startLat, longitude: startLng },
-                delivery_point: { latitude: dropLat, longitude: dropLng }
-            })
-        });
-    } catch (err) {
-        console.error("Failed to update Python Backend Route", err);
-    }
+      if (e) e.preventDefault();
+      console.log("Checkout started");
+      if (itemCount === 0) { toast.error("Cart is empty"); return; }
+      if (isOverweight) { toast.error("Cart is over weight limit"); return; }
+      if (!deliveryAddress) { toast.error("Please select a delivery address"); return; }
+      if (!shop) { toast.error("Shop not found"); return; }
+      
+      const { data: { session } } = await supabase.auth.getSession();
+      let orderId = Math.random().toString(36).substring(7);
+      
+      console.log("Creating order data");
+      const orderData = {
+        user_id: (session && session.user.id !== 'demo-user-123') ? session.user.id : null,
+        shop_id: shop.id,
+        status: 'at_pickup',
+        total_weight_grams: cartTotalWeight,
+        items: Object.entries(cart).map(([id, qty]) => {
+          const item = catalog.find(i => i.id === id);
+          return { id, name: item?.name, qty, price: item?.price };
+        })
+      };
 
-    // Clear cart lock
-    sessionStorage.removeItem('activeCartShopId');
-    navigate(`/tracking/${orderId}?type=marketplace&startLat=${startLat}&startLng=${startLng}&dropLat=${dropLat}&dropLng=${dropLng}`);
+      console.log("Inserting order...");
+      const { data, error } = await supabase.from('orders').insert([orderData]).select().single();
+      if (data && !error) {
+        orderId = data.id;
+        console.log("Order created:", orderId);
+      } else {
+        toast.error("Order failed: " + (error?.message || "Unknown error"));
+        return;
+      }
+      
+      const dropLat = deliveryAddress.lat ?? 24.6380;
+      const dropLng = deliveryAddress.lng ?? 77.3110;
+      const startLat = shop.lat; 
+      const startLng = shop.lng;
+
+      try {
+          const backendUrl = localStorage.getItem('BACKEND_URL') || 'http://localhost:8000';
+          console.log("Fetching backend...");
+          fetch(`${backendUrl}/backend/coordinates/destinations`, {
+              method: 'POST',
+              body: JSON.stringify({
+                  kart: { latitude: startLat, longitude: startLng, heading: 0 },
+                  marketplace: { latitude: startLat, longitude: startLng },
+                  delivery_point: { latitude: dropLat, longitude: dropLng }
+              })
+          }).catch(err => console.error("Failed to update Python Backend Route", err));
+      } catch (err) {
+          console.error("Failed to initiate fetch", err);
+      }
+
+      // Clear cart lock
+      sessionStorage.removeItem('activeCartShopId');
+      console.log("Navigating to tracking...");
+      navigate(`/tracking/${orderId}?type=marketplace&startLat=${startLat}&startLng=${startLng}&dropLat=${dropLat}&dropLng=${dropLng}`);
+    } catch (err: any) {
+      console.error("CRITICAL ERROR IN CHECKOUT:", err);
+      alert("Checkout crashed: " + err.message);
+    }
   };
 
   if (loading) {
@@ -208,9 +222,9 @@ export function ShopPage() {
                   <div key={id} className="flex justify-between items-start border-b border-[var(--border-color)] pb-4 last:border-0 last:pb-0">
                     <div>
                       <p className="font-bold text-[var(--text-main)]">{item.name}</p>
-                      <p className="text-sm font-medium text-[var(--text-muted)]">${item.price.toFixed(2)} × {qty}</p>
+                      <p className="text-sm font-medium text-[var(--text-muted)]">₹{item.price.toFixed(2)} × {qty}</p>
                     </div>
-                    <p className="font-bold text-[var(--text-main)]">${(item.price * qty).toFixed(2)}</p>
+                    <p className="font-bold text-[var(--text-main)]">₹{(item.price * qty).toFixed(2)}</p>
                   </div>
                 );
               })}
@@ -219,7 +233,7 @@ export function ShopPage() {
             <div className="mt-4 pt-4 border-t border-[var(--border-color)]">
               <div className="flex justify-between items-center mb-2">
                 <p className="text-[var(--text-muted)] font-medium">Subtotal</p>
-                <p className="font-semibold text-[var(--text-main)]">${cartTotalPrice.toFixed(2)}</p>
+                <p className="font-semibold text-[var(--text-main)]">₹{cartTotalPrice.toFixed(2)}</p>
               </div>
               <div className="flex justify-between items-center mb-2">
                 <p className="text-[var(--text-muted)] font-medium">Delivery Fee</p>
@@ -227,7 +241,7 @@ export function ShopPage() {
               </div>
               <div className="flex justify-between items-center mt-4 pt-4 border-t border-[var(--border-color)]">
                 <p className="font-bold text-[var(--text-main)] text-lg">Total Amount</p>
-                <p className="text-2xl font-black text-[var(--color-sky)]">${cartTotalPrice.toFixed(2)}</p>
+                <p className="text-2xl font-black text-[var(--color-sky)]">₹{cartTotalPrice.toFixed(2)}</p>
               </div>
             </div>
           </div>
@@ -292,13 +306,12 @@ export function ShopPage() {
         <div className="fixed bottom-28 left-0 right-0 px-6 z-40 pointer-events-none">
           <div className="max-w-xs mx-auto pointer-events-auto">
             <button 
-              form="checkout-form"
-              type="submit"
-              disabled={!deliveryAddress}
-              className="w-full minimal-button bg-[var(--color-green)] text-white text-base py-3.5 flex justify-between items-center px-5 disabled:opacity-50 shadow-xl hover:shadow-2xl transition-shadow"
+              onClick={handleCheckoutSubmit}
+              type="button"
+              className="w-full primary-button text-white text-base py-3.5 flex justify-between items-center px-5"
             >
               <span className="font-bold">Place Order</span>
-              <span className="font-bold bg-white/20 px-3 py-1 rounded-xl text-sm">${cartTotalPrice.toFixed(2)}</span>
+              <span className="font-bold bg-white/20 px-3 py-1 rounded-xl text-sm">₹{cartTotalPrice.toFixed(2)}</span>
             </button>
           </div>
         </div>
@@ -368,7 +381,7 @@ export function ShopPage() {
                   <ShoppingCart className="w-4 h-4" />
                   <span className="font-semibold">Checkout ({itemCount})</span>
                 </div>
-                <span className="font-bold">${cartTotalPrice.toFixed(2)}</span>
+                <span className="font-bold">₹{cartTotalPrice.toFixed(2)}</span>
               </button>
             </div>
           </motion.div>

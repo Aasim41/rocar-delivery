@@ -139,4 +139,5 @@ create policy "Shop owners can delete items in their own shop." on public.items
 -- Realtime enablement
 create publication supabase_realtime;
 alter publication supabase_realtime add table public.deliveries;
+alter publication supabase_realtime add table public.orders;
 alter publication supabase_realtime add table public.items;

@@ -1,7 +1,7 @@
-from create_path import get_google_route
-from decode_route import extract_route_points
-from navigate import navigate
-from movement import movement
+from navigation.create_path import get_google_route
+from navigation.decode_route import extract_route_points
+from navigation.navigate import navigate
+from navigation.movement import movement
 def pipeline(mp, k, dp, He, frame):
     receive_path = get_google_route(k, mp)
     deliver_path = get_google_route(k, dp)

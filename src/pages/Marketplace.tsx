@@ -7,6 +7,7 @@ import { AddressModal, type SavedLocation } from '../components/AddressModal';
 
 import { supabase } from '../lib/supabase';
 import { WaveInput } from '../components/WaveInput';
+import { ThemeToggle } from '../components/ThemeToggle';
 
 const MAX_PAYLOAD_GRAMS = 2000;
 
@@ -131,60 +132,73 @@ export function Marketplace() {
   const itemCount = Object.values(cart).reduce((a, b) => a + b, 0);
   const weightPercentage = Math.min(100, (cartTotalWeight / MAX_PAYLOAD_GRAMS) * 100);
 
-  const handleCheckoutSubmit = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (itemCount === 0 || isOverweight || !deliveryAddress) return;
-    
-    const { data: { session } } = await supabase.auth.getSession();
-    let orderId = Math.random().toString(36).substring(7);
-    
-    const storedCartShop = sessionStorage.getItem('activeCartShopId');
-    const shop = shops.find(s => s.id === storedCartShop);
-    if (!shop) {
-       alert("Shop data missing!");
-       return;
-    }
-    
-    const orderData = {
-      user_id: (session && session.user.id !== 'demo-user-123') ? session.user.id : null,
-      shop_id: shop.id,
-      status: 'at_pickup',
-      total_weight_grams: cartTotalWeight,
-      items: Object.entries(cart).map(([id, qty]) => {
-        const item = catalog.find(i => i.id === id);
-        return { id, name: item?.name, qty, price: item?.price };
-      })
-    };
-
-    const { data, error } = await supabase.from('orders').insert([orderData]).select().single();
-    if (data && !error) {
-      orderId = data.id;
-    } else {
-      alert("Order failed: " + (error?.message || "Unknown error"));
-      return;
-    }
-    
-    const dropLat = deliveryAddress.lat ?? 24.6380;
-    const dropLng = deliveryAddress.lng ?? 77.3110;
-    const startLat = shop.lat; 
-    const startLng = shop.lng;
-
+  const handleCheckoutSubmit = async (e?: React.FormEvent | React.MouseEvent) => {
     try {
-        const backendUrl = localStorage.getItem('BACKEND_URL') || 'http://localhost:8000';
-        await fetch(`${backendUrl}/backend/coordinates/destinations`, {
-            method: 'POST',
-            body: JSON.stringify({
-                kart: { latitude: startLat, longitude: startLng, heading: 0 },
-                marketplace: { latitude: startLat, longitude: startLng },
-                delivery_point: { latitude: dropLat, longitude: dropLng }
-            })
-        });
-    } catch (err) {
-        console.error("Failed to update Python Backend Route", err);
-    }
+      if (e) e.preventDefault();
+      console.log("Checkout started");
+      if (itemCount === 0) { toast.error("Cart is empty"); return; }
+      if (isOverweight) { toast.error("Cart is over weight limit"); return; }
+      if (!deliveryAddress) { toast.error("Please select a delivery address"); return; }
+      
+      const { data: { session } } = await supabase.auth.getSession();
+      let orderId = Math.random().toString(36).substring(7);
+      
+      const storedCartShop = sessionStorage.getItem('activeCartShopId');
+      const shop = shops.find(s => s.id === storedCartShop);
+      if (!shop) {
+         toast.error("Shop data missing!");
+         return;
+      }
+      
+      console.log("Creating order data");
+      const orderData = {
+        user_id: (session && session.user.id !== 'demo-user-123') ? session.user.id : null,
+        shop_id: shop.id,
+        status: 'at_pickup',
+        total_weight_grams: cartTotalWeight,
+        items: Object.entries(cart).map(([id, qty]) => {
+          const item = catalog.find(i => i.id === id);
+          return { id, name: item?.name, qty, price: item?.price };
+        })
+      };
 
-    sessionStorage.removeItem('activeCartShopId');
-    navigate(`/tracking/${orderId}?type=marketplace&startLat=${startLat}&startLng=${startLng}&dropLat=${dropLat}&dropLng=${dropLng}`);
+      console.log("Inserting order...");
+      const { data, error } = await supabase.from('orders').insert([orderData]).select().single();
+      if (data && !error) {
+        orderId = data.id;
+        console.log("Order created:", orderId);
+      } else {
+        toast.error("Order failed: " + (error?.message || "Unknown error"));
+        return;
+      }
+      
+      const dropLat = deliveryAddress.lat ?? 24.6380;
+      const dropLng = deliveryAddress.lng ?? 77.3110;
+      const startLat = shop.lat; 
+      const startLng = shop.lng;
+
+      try {
+          const backendUrl = localStorage.getItem('BACKEND_URL') || 'http://localhost:8000';
+          console.log("Fetching backend...");
+          fetch(`${backendUrl}/backend/coordinates/destinations`, {
+              method: 'POST',
+              body: JSON.stringify({
+                  kart: { latitude: startLat, longitude: startLng, heading: 0 },
+                  marketplace: { latitude: startLat, longitude: startLng },
+                  delivery_point: { latitude: dropLat, longitude: dropLng }
+              })
+          }).catch(err => console.error("Failed to update Python Backend Route", err));
+      } catch (err) {
+          console.error("Failed to initiate fetch", err);
+      }
+
+      sessionStorage.removeItem('activeCartShopId');
+      console.log("Navigating to tracking...");
+      navigate(`/tracking/${orderId}?type=marketplace&startLat=${startLat}&startLng=${startLng}&dropLat=${dropLat}&dropLng=${dropLng}`);
+    } catch (err: any) {
+      console.error("CRITICAL ERROR IN CHECKOUT:", err);
+      alert("Checkout crashed: " + err.message);
+    }
   };
 
   const filteredCatalog = catalog.filter(i => i.name.toLowerCase().includes(searchQuery.toLowerCase()));
@@ -240,7 +254,7 @@ export function Marketplace() {
             <div className="mt-4 pt-4 border-t border-[var(--border-color)]">
               <div className="flex justify-between items-center mb-2">
                 <p className="text-[var(--text-muted)] font-medium">Subtotal</p>
-                <p className="font-semibold text-[var(--text-main)]">${cartTotalPrice.toFixed(2)}</p>
+                <p className="font-semibold text-[var(--text-main)]">₹{cartTotalPrice.toFixed(2)}</p>
               </div>
               <div className="flex justify-between items-center mb-2">
                 <p className="text-[var(--text-muted)] font-medium">Delivery Fee</p>
@@ -248,7 +262,7 @@ export function Marketplace() {
               </div>
               <div className="flex justify-between items-center mt-4 pt-4 border-t border-[var(--border-color)]">
                 <p className="font-bold text-[var(--text-main)] text-lg">Total Amount</p>
-                <p className="text-2xl font-black text-[var(--color-sky)]">${cartTotalPrice.toFixed(2)}</p>
+                <p className="text-2xl font-black text-[var(--color-sky)]">₹{cartTotalPrice.toFixed(2)}</p>
               </div>
             </div>
           </div>
@@ -313,13 +327,12 @@ export function Marketplace() {
         <div className="fixed bottom-28 left-0 right-0 px-6 z-40 pointer-events-none">
           <div className="max-w-xs mx-auto pointer-events-auto">
             <button 
-              form="checkout-form"
-              type="submit"
-              disabled={!deliveryAddress || !activeCartShop}
-              className="w-full minimal-button bg-[var(--color-green)] text-white text-base py-3.5 flex justify-between items-center px-5 disabled:opacity-50 shadow-xl hover:shadow-2xl transition-shadow"
+              onClick={handleCheckoutSubmit}
+              type="button"
+              className="w-full primary-button text-white text-base py-3.5 flex justify-between items-center px-5"
             >
               <span className="font-bold">Place Order</span>
-              <span className="font-bold bg-white/20 px-3 py-1 rounded-xl text-sm">${cartTotalPrice.toFixed(2)}</span>
+              <span className="font-bold bg-white/20 px-3 py-1 rounded-xl text-sm">₹{cartTotalPrice.toFixed(2)}</span>
             </button>
           </div>
         </div>
@@ -338,12 +351,15 @@ export function Marketplace() {
       <header className="px-6 py-4 glass-panel sticky top-0 z-40 shadow-sm mb-4 rounded-b-3xl mx-2 mt-2">
         <div className="flex items-center justify-between mb-4">
           <h1 className="text-2xl font-bold text-[var(--text-main)] tracking-tight">Marketplace</h1>
-          <button 
-            onClick={() => navigate('/profile')}
-            className="w-10 h-10 rounded-full bg-[var(--color-sky)]/10 flex items-center justify-center border border-[var(--color-sky)]/20 hover:bg-[var(--color-sky)]/20 transition-colors"
-          >
-            <User className="w-5 h-5 text-[var(--color-sky)]" />
-          </button>
+          <div className="flex items-center space-x-2">
+            <ThemeToggle />
+            <button 
+              onClick={() => navigate('/profile')}
+              className="w-10 h-10 rounded-full bg-[var(--color-sky)]/10 flex items-center justify-center border border-[var(--color-sky)]/20 hover:bg-[var(--color-sky)]/20 transition-colors"
+            >
+              <User className="w-5 h-5 text-[var(--color-sky)]" />
+            </button>
+          </div>
         </div>
         
         <div className="flex justify-between text-xs font-semibold uppercase tracking-wider mb-2 text-[var(--text-muted)]">
@@ -369,14 +385,14 @@ export function Marketplace() {
       {!searchQuery && shops.length > 0 && (
          <div className="mb-8">
             <h2 className="text-lg font-bold text-[var(--text-main)] px-6 mb-4">Shops</h2>
-            <div className="flex overflow-x-auto space-x-4 px-6 pb-4 snap-x no-scrollbar">
+            <div className="flex overflow-x-auto space-x-4 px-6 pb-4 snap-x no-scrollbar justify-center">
                {shops.map(shop => (
                   <button 
                      key={shop.id}
                      onClick={() => navigate(`/shop/${shop.id}`)}
-                     className="min-w-[200px] bg-[var(--bg-page)] rounded-2xl shadow-sm border border-[var(--border-color)] overflow-hidden snap-start hover:shadow-md transition-shadow active:scale-95 text-left"
+                     className="min-w-[240px] max-w-[280px] bg-[var(--bg-page)] rounded-2xl shadow-sm border border-[var(--border-color)] overflow-hidden snap-center hover:shadow-md transition-shadow active:scale-95 text-left"
                   >
-                     <div className="h-24 bg-[var(--border-color)] w-full">
+                     <div className="h-28 bg-[var(--border-color)] w-full">
                         {shop.banner_url ? (
                            <img src={shop.banner_url} alt={shop.name} className="w-full h-full object-cover" />
                         ) : (
@@ -384,7 +400,7 @@ export function Marketplace() {
                         )}
                      </div>
                      <div className="p-3">
-                        <h3 className="font-bold text-sm text-[var(--text-main)] truncate">{shop.name}</h3>
+                        <h3 className="font-bold text-base text-[var(--text-main)] truncate">{shop.name}</h3>
                         {shop.categories && shop.categories.length > 0 && (
                            <p className="text-xs text-[var(--text-muted)] mt-1 truncate">{shop.categories.join(', ')}</p>
                         )}
@@ -436,7 +452,7 @@ export function Marketplace() {
                   <ShoppingCart className="w-4 h-4" />
                   <span className="font-semibold">Checkout ({itemCount})</span>
                 </div>
-                <span className="font-bold">${cartTotalPrice.toFixed(2)}</span>
+                <span className="font-bold">₹{cartTotalPrice.toFixed(2)}</span>
               </button>
             </div>
           </motion.div>

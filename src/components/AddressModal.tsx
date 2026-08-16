@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MapPin, Plus, X, LocateFixed, Loader2 } from 'lucide-react';
+import { toast } from 'react-hot-toast';
 import { supabase } from '../lib/supabase';
 import { LocationMap } from './LocationMap';
 import { WaveInput } from './WaveInput';
@@ -71,7 +72,7 @@ export function AddressModal({ isOpen, onClose, onSelect, title = "Select Addres
       setNewLng(position.coords.longitude);
     } catch (error) {
       console.error(error);
-      alert("Please enable GPS permissions to capture your location.");
+      toast.error("Please enable GPS permissions to capture your location.");
       setNewLat(24.6355);
       setNewLng(77.3090);
     } finally {

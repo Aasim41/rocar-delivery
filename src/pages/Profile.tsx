@@ -239,43 +239,23 @@ export function Profile() {
         </div>
       </div>
 
-      {/* Order History */}
+      {/* Order History Link */}
       <div className="mb-8 relative z-10">
-        <h3 className="text-lg font-bold text-[var(--text-main)] mb-4 px-1">Order History</h3>
-        <div className="space-y-3">
-          {orders.length > 0 ? (
-            orders.map(order => (
-              <div key={order.id} onClick={() => navigate(`/tracking/${order.id}?type=marketplace`)} className="glass-card p-4 cursor-pointer hover:border-[var(--color-sky)]/50 transition-colors">
-                <div className="flex justify-between items-start mb-3">
-                  <div className="flex items-center space-x-3">
-                    <div className="bg-[var(--color-yellow)]/10 p-2 rounded-xl">
-                      <Package className="w-5 h-5 text-[var(--color-yellow)]" />
-                    </div>
-                    <div>
-                      <p className="font-semibold text-[var(--text-main)] truncate max-w-[160px]">
-                        {order.items && order.items.length > 0 ? order.items[0].name : 'Delivery Order'}
-                        {order.items && order.items.length > 1 ? ` (+${order.items.length - 1})` : ''}
-                      </p>
-                      <p className="text-xs text-[var(--text-muted)] font-medium">#{order.id.split('-')[0]} • {new Date(order.created_at).toLocaleDateString()}</p>
-                    </div>
-                  </div>
-                  <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full ${order.status === 'arrived' ? 'bg-[var(--color-green)]/10 text-[var(--color-green)]' : 'bg-[var(--bg-page)] text-[var(--text-muted)]'}`}>
-                    {order.status.replace('_', ' ')}
-                  </span>
-                </div>
-                <div className="flex items-center space-x-2 text-xs text-[var(--text-muted)] font-medium bg-[var(--bg-page)]/50 rounded-lg p-2">
-                  <Clock className="w-3.5 h-3.5" />
-                  <span>{order.items?.length || 0} items • {order.total_weight_grams}g</span>
-                </div>
-              </div>
-            ))
-          ) : (
-            <div className="glass-card p-8 text-center border-dashed border-2">
-              <Package className="w-8 h-8 text-[var(--text-muted)] mx-auto mb-2 opacity-50" />
-              <p className="text-sm font-medium text-[var(--text-muted)]">No past orders.</p>
-            </div>
-          )}
-        </div>
+        <button 
+          onClick={() => navigate('/orders')}
+          className="w-full glass-card flex items-center p-4 hover:border-[var(--color-sky)]/50 transition-colors text-left"
+        >
+          <div className="w-12 h-12 bg-[var(--color-sky)]/10 rounded-full flex items-center justify-center shrink-0 mr-4">
+            <Package className="w-6 h-6 text-[var(--color-sky)]" />
+          </div>
+          <div className="flex-1">
+            <h3 className="font-bold text-lg text-[var(--text-main)]">Order History</h3>
+            <p className="text-sm font-medium text-[var(--text-muted)]">View your past orders and receipts</p>
+          </div>
+          <div className="text-[var(--text-muted)]">
+            →
+          </div>
+        </button>
       </div>
 
       {/* Settings */}

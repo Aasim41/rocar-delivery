@@ -8,9 +8,11 @@ import { Login } from './pages/Login';
 import { ShopPortal } from './pages/ShopPortal';
 import { ShopPage } from './pages/ShopPage';
 import { Profile } from './pages/Profile';
+import { OrderHistory } from './pages/OrderHistory';
 import { supabase } from './lib/supabase';
 import { registerPushNotifications, initPushNotificationListeners } from './lib/pushNotifications';
 import { Loader2 } from 'lucide-react';
+import { Toaster, toast } from 'react-hot-toast';
 
 function AppRoutes() {
   const location = useLocation();
@@ -23,7 +25,6 @@ function AppRoutes() {
   });
 
   useEffect(() => {
-    // Initialize theme from local storage
     if (localStorage.getItem('theme') === 'dark' || (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
       document.documentElement.classList.add('dark');
     } else {
@@ -34,7 +35,6 @@ function AppRoutes() {
       setSession(currentSession);
       if (currentSession) {
         fetchUserProfile(currentSession.user.id, currentSession);
-        // Initialize Push Notifications once logged in
         initPushNotificationListeners();
         registerPushNotifications();
       } else {
@@ -68,8 +68,6 @@ function AppRoutes() {
         .single();
 
       if (error && error.code === 'PGRST116') {
-        // User record doesn't exist yet, this is a new signup
-        // Create profile using the role passed during signup (default to buyer if missing)
         const roleToInsert = currentSession?.user?.user_metadata?.role || 'buyer';
         const nameToInsert = localStorage.getItem('onboarding_name') || '';
         const ageStr = localStorage.getItem('onboarding_age');
@@ -90,16 +88,14 @@ function AppRoutes() {
           setUserRole(newData.role || roleToInsert);
         } else {
           if (insertError) {
-             alert(`Database Insert Error: ${insertError.message} (Code: ${insertError.code})`);
+             toast.error(`Database Insert Error: ${insertError.message} (Code: ${insertError.code})`);
              console.error("Insert error:", insertError);
           }
-          // If insert fails, fallback to the role they signed up with so they see the right UI
           setUserRole(roleToInsert);
         }
       } else if (data) {
         setUserRole(data.role || 'buyer');
         
-        // If we just finished onboarding and have data in local storage, sync it to the existing profile
         const nameToInsert = localStorage.getItem('onboarding_name');
         const ageStr = localStorage.getItem('onboarding_age');
         
@@ -111,7 +107,7 @@ function AppRoutes() {
            if (Object.keys(updates).length > 0) {
               const { error: updateError } = await supabase.from('users').update(updates).eq('id', userId);
               if (updateError) {
-                alert(`Database Update Error: ${updateError.message} (Code: ${updateError.code})`);
+                toast.error(`Database Update Error: ${updateError.message} (Code: ${updateError.code})`);
                 console.error("Update error:", updateError);
               } else {
                 localStorage.removeItem('onboarding_name');
@@ -145,17 +141,14 @@ function AppRoutes() {
     return <Navigate to="/login" replace />;
   }
 
-  // Shop owners are forced to the shop portal
   if (userRole === 'shop_owner' && location.pathname !== '/shop-portal') {
     return <Navigate to="/shop-portal" replace />;
   }
 
-  // Buyers are forced out of shop portal
   if (userRole === 'buyer' && location.pathname === '/shop-portal') {
     return <Navigate to="/" replace />;
   }
 
-  // If they are on login but already logged in, redirect them out
   if (session && location.pathname === '/login') {
     return <Navigate to={userRole === 'shop_owner' ? '/shop-portal' : '/'} replace />;
   }
@@ -171,9 +164,9 @@ function AppRoutes() {
           <Route path="/shop/:shopId" element={<ShopPage />} />
           <Route path="/tracking/:id" element={<OrderTracking />} />
           <Route path="/profile" element={<Profile />} />
+          <Route path="/orders" element={<OrderHistory />} />
         </Routes>
       </AnimatePresence>
-
     </>
   );
 }
@@ -185,6 +178,7 @@ function App() {
         <main className="flex-1 overflow-x-hidden">
           <AppRoutes />
         </main>
+        <Toaster position="top-center" reverseOrder={false} />
       </div>
     </BrowserRouter>
   );

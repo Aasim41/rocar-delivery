@@ -88,8 +88,8 @@ export function LiveMap({ startLat, startLng, dropLat, dropLng, currentLat, curr
               const p1 = rawPath[i];
               const p2 = rawPath[i+1];
               const dist = Math.sqrt(Math.pow(p2.lat - p1.lat, 2) + Math.pow(p2.lng - p1.lng, 2));
-              // Only 200 steps per degree (very fast) instead of 6000
-              const steps = Math.max(1, Math.floor(dist * 200)); 
+              // Increase steps to slow down the animation (e.g. 3000 steps per degree)
+              const steps = Math.max(1, Math.floor(dist * 3000));
               for (let j = 0; j < steps; j++) {
                 interpolatedPath.push({
                   lat: p1.lat + (p2.lat - p1.lat) * (j / steps),
@@ -137,13 +137,16 @@ export function LiveMap({ startLat, startLng, dropLat, dropLng, currentLat, curr
       setRobotPos(pos);
       
       // Push live location to python backend to link with Streamlit dash
-      const backendUrl = localStorage.getItem('BACKEND_URL') || 'http://localhost:8000';
-      fetch(`${backendUrl}/backend/coordinates/live`, {
-        method: 'POST',
-        body: JSON.stringify({ latitude: pos.lat, longitude: pos.lng })
-      }).catch(err => console.log("Dash map link failed:", err));
+      // Throttle backend updates to roughly once per second (every 10th step)
+      if (step % 10 === 0) {
+        const backendUrl = localStorage.getItem('BACKEND_URL') || 'http://localhost:8000';
+        fetch(`${backendUrl}/backend/coordinates/live`, {
+          method: 'POST',
+          body: JSON.stringify({ latitude: pos.lat, longitude: pos.lng })
+        }).catch(err => console.log("Dash map link failed:", err));
+      }
       
-    }, 1000); // Move every 1 second
+    }, 100); // Move smoothly every 100ms
 
     return () => clearInterval(interval);
   }, [routePath, currentLat, currentLng, isMoving]);
