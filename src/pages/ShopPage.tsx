@@ -1,19 +1,17 @@
 import { useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { ShoppingCart, Plus, Minus, AlertCircle, ArrowLeft, MapPin, Loader2, User, Store } from 'lucide-react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { ShoppingCart, Plus, Minus, AlertCircle, ArrowLeft, MapPin, Loader2, Store } from 'lucide-react';
 import { motion, AnimatePresence, useInView } from 'framer-motion';
 import { LocationMap } from '../components/LocationMap';
 import { AddressModal, type SavedLocation } from '../components/AddressModal';
-
 import { supabase } from '../lib/supabase';
 import { WaveInput } from '../components/WaveInput';
 
 const MAX_PAYLOAD_GRAMS = 2000;
 
-function CatalogItem({ item, cart, updateCart, shops }: any) {
+function CatalogItem({ item, cart, updateCart }: any) {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: "-50px" });
-  const shop = shops.find((s: any) => s.id === item.shop_id);
 
   return (
     <motion.div 
@@ -29,15 +27,12 @@ function CatalogItem({ item, cart, updateCart, shops }: any) {
             <h3 className="font-bold text-[var(--text-main)] text-lg tracking-tight">{item.name}</h3>
             {!item.in_stock && <span className="text-[10px] uppercase tracking-wider font-semibold bg-[var(--text-muted)]/20 text-[var(--text-muted)] px-2 py-0.5 rounded-md">Out of Stock</span>}
           </div>
-          <p className="text-[var(--text-muted)] text-xs font-semibold mt-0.5 mb-1 flex items-center">
-            <Store className="w-3 h-3 mr-1" /> {shop?.name || 'Unknown Shop'}
-          </p>
           <p className="text-[var(--text-muted)] font-medium mt-1 text-sm bg-[var(--color-sky)]/10 inline-block px-2 py-0.5 rounded-md text-[var(--color-sky)]">${item.price.toFixed(2)} • {item.weight}g</p>
         </div>
         
         <div className="flex items-center space-x-3 bg-[var(--bg-page)]/50 rounded-2xl p-1.5 border border-[var(--border-color)] ml-4">
           <button 
-            onClick={() => updateCart(item, -1)}
+            onClick={() => updateCart(item.id, -1)}
             className="w-8 h-8 flex items-center justify-center rounded-xl bg-white/50 dark:bg-black/30 border border-[var(--border-color)] text-[var(--text-main)] hover:scale-105 active:scale-95 transition-all disabled:opacity-50"
             disabled={!cart[item.id] || !item.in_stock}
           >
@@ -47,7 +42,7 @@ function CatalogItem({ item, cart, updateCart, shops }: any) {
             {cart[item.id] || 0}
           </span>
           <button 
-            onClick={() => updateCart(item, 1)}
+            onClick={() => updateCart(item.id, 1)}
             className="w-8 h-8 flex items-center justify-center rounded-xl bg-[var(--color-green)] text-white hover:scale-105 active:scale-95 transition-all disabled:opacity-50 shadow-sm"
             disabled={!item.in_stock}
           >
@@ -59,60 +54,51 @@ function CatalogItem({ item, cart, updateCart, shops }: any) {
   );
 }
 
-export function Marketplace() {
+export function ShopPage() {
+  const { shopId } = useParams();
+  const navigate = useNavigate();
+  const [shop, setShop] = useState<any>(null);
   const [catalog, setCatalog] = useState<any[]>([]);
-  const [shops, setShops] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [cart, setCart] = useState<Record<string, number>>({});
   const [showCheckoutForm, setShowCheckoutForm] = useState(false);
   const [deliveryAddress, setDeliveryAddress] = useState<SavedLocation | null>(null);
   const [showAddressModal, setShowAddressModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  
-  const navigate = useNavigate();
 
   useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
-    const { data: shopsData } = await supabase.from('shops').select('*');
-    if (shopsData) setShops(shopsData);
-
-    const { data: itemsData } = await supabase.from('items').select('*').order('name');
-    if (itemsData) setCatalog(itemsData);
-
-    // check if there's an active cart shop
+    if (!shopId) return;
+    
+    // Check if cart has items from another shop and clear it (Rule: 1 shop per cart)
     const storedCartShop = sessionStorage.getItem('activeCartShopId');
-    if (!storedCartShop) {
-      setCart({});
+    if (storedCartShop && storedCartShop !== shopId) {
+       setCart({});
+       sessionStorage.setItem('activeCartShopId', shopId);
+    } else if (!storedCartShop) {
+       sessionStorage.setItem('activeCartShopId', shopId);
     }
 
+    fetchShopData();
+  }, [shopId]);
+
+  const fetchShopData = async () => {
+    if (!shopId) return;
+    const { data: shopData } = await supabase.from('shops').select('*').eq('id', shopId).single();
+    if (shopData) setShop(shopData);
+
+    const { data: itemsData } = await supabase.from('items').select('*').eq('shop_id', shopId).order('name');
+    if (itemsData) setCatalog(itemsData);
+    
     setLoading(false);
   };
 
-  const updateCart = (item: any, delta: number) => {
-    const storedCartShop = sessionStorage.getItem('activeCartShopId');
-    if (delta > 0 && storedCartShop && storedCartShop !== item.shop_id) {
-       if (window.confirm("Your cart contains items from another shop. Clear cart to add this item?")) {
-          setCart({ [item.id]: 1 });
-          sessionStorage.setItem('activeCartShopId', item.shop_id);
-       }
-       return;
-    } else if (delta > 0 && !storedCartShop) {
-       sessionStorage.setItem('activeCartShopId', item.shop_id);
-    }
-
+  const updateCart = (id: string, delta: number) => {
     setCart(prev => {
-      const current = prev[item.id] || 0;
+      const current = prev[id] || 0;
       const next = Math.max(0, current + delta);
       const newCart = { ...prev };
-      if (next === 0) delete newCart[item.id];
-      else newCart[item.id] = next;
-      
-      if (Object.keys(newCart).length === 0) {
-         sessionStorage.removeItem('activeCartShopId');
-      }
+      if (next === 0) delete newCart[id];
+      else newCart[id] = next;
       return newCart;
     });
   };
@@ -129,21 +115,16 @@ export function Marketplace() {
 
   const isOverweight = cartTotalWeight > MAX_PAYLOAD_GRAMS;
   const itemCount = Object.values(cart).reduce((a, b) => a + b, 0);
-  const weightPercentage = Math.min(100, (cartTotalWeight / MAX_PAYLOAD_GRAMS) * 100);
+  
+
+  const filteredCatalog = catalog.filter(i => i.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
   const handleCheckoutSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (itemCount === 0 || isOverweight || !deliveryAddress) return;
+    if (itemCount === 0 || isOverweight || !deliveryAddress || !shop) return;
     
     const { data: { session } } = await supabase.auth.getSession();
     let orderId = Math.random().toString(36).substring(7);
-    
-    const storedCartShop = sessionStorage.getItem('activeCartShopId');
-    const shop = shops.find(s => s.id === storedCartShop);
-    if (!shop) {
-       alert("Shop data missing!");
-       return;
-    }
     
     const orderData = {
       user_id: (session && session.user.id !== 'demo-user-123') ? session.user.id : null,
@@ -183,12 +164,10 @@ export function Marketplace() {
         console.error("Failed to update Python Backend Route", err);
     }
 
+    // Clear cart lock
     sessionStorage.removeItem('activeCartShopId');
     navigate(`/tracking/${orderId}?type=marketplace&startLat=${startLat}&startLng=${startLng}&dropLat=${dropLat}&dropLng=${dropLng}`);
   };
-
-  const filteredCatalog = catalog.filter(i => i.name.toLowerCase().includes(searchQuery.toLowerCase()));
-  const activeCartShop = shops.find(s => s.id === sessionStorage.getItem('activeCartShopId'));
 
   if (loading) {
     return (
@@ -211,7 +190,7 @@ export function Marketplace() {
             <button onClick={() => setShowCheckoutForm(false)} className="p-2 -ml-2 rounded-full hover:bg-[var(--border-color)] text-[var(--text-main)] transition-colors">
               <ArrowLeft className="w-6 h-6" />
             </button>
-            <h1 className="text-2xl font-bold text-[var(--text-main)] tracking-tight">Your Cart</h1>
+            <h1 className="text-2xl font-bold text-[var(--text-main)] tracking-tight">Checkout</h1>
           </div>
         </header>
 
@@ -264,8 +243,8 @@ export function Marketplace() {
                   <Store className="h-5 w-5 text-[var(--text-muted)]" />
                 </div>
                 <div className="flex-1">
-                  <p className="font-bold text-[var(--text-main)]">{activeCartShop?.name || 'Shop'} (Start)</p>
-                  <p className="text-xs text-[var(--text-muted)] font-mono mt-0.5">{activeCartShop?.lat?.toFixed(5)}, {activeCartShop?.lng?.toFixed(5)}</p>
+                  <p className="font-bold text-[var(--text-main)]">{shop.name} (Start)</p>
+                  <p className="text-xs text-[var(--text-muted)] font-mono mt-0.5">{shop.lat?.toFixed(5)}, {shop.lng?.toFixed(5)}</p>
                 </div>
               </div>
 
@@ -289,11 +268,11 @@ export function Marketplace() {
                 </div>
               </button>
 
-              {activeCartShop && deliveryAddress && (
+              {deliveryAddress && (
                 <div className="h-40 mt-4 rounded-xl overflow-hidden shadow-inner border border-[var(--border-color)]">
                   <LocationMap 
                     locations={[
-                      { address: `GPS: ${activeCartShop.lat}, ${activeCartShop.lng}`, label: activeCartShop.name + " (Start)" },
+                      { address: `GPS: ${shop.lat}, ${shop.lng}`, label: shop.name + " (Start)" },
                       { address: `GPS: ${deliveryAddress.lat}, ${deliveryAddress.lng}`, label: deliveryAddress.name + " (End)" }
                     ]} 
                   />
@@ -315,7 +294,7 @@ export function Marketplace() {
             <button 
               form="checkout-form"
               type="submit"
-              disabled={!deliveryAddress || !activeCartShop}
+              disabled={!deliveryAddress}
               className="w-full minimal-button bg-[var(--color-green)] text-white text-base py-3.5 flex justify-between items-center px-5 disabled:opacity-50 shadow-xl hover:shadow-2xl transition-shadow"
             >
               <span className="font-bold">Place Order</span>
@@ -332,83 +311,36 @@ export function Marketplace() {
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       className="pb-40 min-h-screen font-sans relative overflow-hidden"
     >
-      <div className="absolute top-0 right-0 w-96 h-96 bg-[var(--color-yellow)] rounded-full opacity-10 blur-[100px] pointer-events-none z-0" />
-      <div className="absolute top-[50%] left-[-10%] w-80 h-80 bg-[var(--color-sky)] rounded-full opacity-10 blur-[100px] pointer-events-none z-0" />
-
       <header className="px-6 py-4 glass-panel sticky top-0 z-40 shadow-sm mb-4 rounded-b-3xl mx-2 mt-2">
-        <div className="flex items-center justify-between mb-4">
-          <h1 className="text-2xl font-bold text-[var(--text-main)] tracking-tight">Marketplace</h1>
-          <button 
-            onClick={() => navigate('/profile')}
-            className="w-10 h-10 rounded-full bg-[var(--color-sky)]/10 flex items-center justify-center border border-[var(--color-sky)]/20 hover:bg-[var(--color-sky)]/20 transition-colors"
-          >
-            <User className="w-5 h-5 text-[var(--color-sky)]" />
+        <div className="flex items-center space-x-3 mb-2">
+          <button onClick={() => navigate(-1)} className="p-2 -ml-2 rounded-full hover:bg-[var(--border-color)] text-[var(--text-main)] transition-colors">
+            <ArrowLeft className="w-6 h-6" />
           </button>
         </div>
-        
-        <div className="flex justify-between text-xs font-semibold uppercase tracking-wider mb-2 text-[var(--text-muted)]">
-          <span>Payload {activeCartShop ? `(From: ${activeCartShop.name})` : ''}</span>
-          <motion.span animate={{ color: isOverweight ? 'var(--color-red)' : 'var(--color-green)' }}>
-            {cartTotalWeight}g / {MAX_PAYLOAD_GRAMS}g
-          </motion.span>
-        </div>
-        <div className="w-full h-3 bg-[var(--border-color)] rounded-full overflow-hidden">
-          <motion.div 
-            initial={{ width: 0 }}
-            animate={{ width: `${weightPercentage}%`, backgroundColor: isOverweight ? 'var(--color-red)' : 'var(--color-green)' }}
-            transition={{ type: 'spring', bounce: 0, duration: 0.8 }}
-            className="h-full rounded-full"
-          />
+        <div className="flex flex-col mb-4">
+          {shop?.banner_url && (
+            <div className="w-full h-32 rounded-2xl overflow-hidden mb-4 shadow-sm border border-[var(--border-color)]">
+              <img src={shop.banner_url} alt={shop.name} className="w-full h-full object-cover" />
+            </div>
+          )}
+          <h1 className="text-2xl font-bold text-[var(--text-main)] tracking-tight">{shop?.name || 'Shop'}</h1>
+          {shop?.categories && shop.categories.length > 0 && (
+             <p className="text-sm font-medium text-[var(--text-muted)] mt-1">{shop.categories.join(', ')}</p>
+          )}
         </div>
       </header>
 
       <div className="px-6 mb-6 max-w-xl mx-auto relative z-10">
-         <WaveInput type="text" label="Search" placeholder="Search across all shops..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+         <WaveInput type="text" label="Search" placeholder={`Search in ${shop?.name}...`} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
       </div>
 
-      {!searchQuery && shops.length > 0 && (
-         <div className="mb-8">
-            <h2 className="text-lg font-bold text-[var(--text-main)] px-6 mb-4">Shops</h2>
-            <div className="flex overflow-x-auto space-x-4 px-6 pb-4 snap-x no-scrollbar">
-               {shops.map(shop => (
-                  <button 
-                     key={shop.id}
-                     onClick={() => navigate(`/shop/${shop.id}`)}
-                     className="min-w-[200px] bg-[var(--bg-page)] rounded-2xl shadow-sm border border-[var(--border-color)] overflow-hidden snap-start hover:shadow-md transition-shadow active:scale-95 text-left"
-                  >
-                     <div className="h-24 bg-[var(--border-color)] w-full">
-                        {shop.banner_url ? (
-                           <img src={shop.banner_url} alt={shop.name} className="w-full h-full object-cover" />
-                        ) : (
-                           <div className="w-full h-full flex items-center justify-center text-[var(--text-muted)]"><Store /></div>
-                        )}
-                     </div>
-                     <div className="p-3">
-                        <h3 className="font-bold text-sm text-[var(--text-main)] truncate">{shop.name}</h3>
-                        {shop.categories && shop.categories.length > 0 && (
-                           <p className="text-xs text-[var(--text-muted)] mt-1 truncate">{shop.categories.join(', ')}</p>
-                        )}
-                     </div>
-                  </button>
-               ))}
-            </div>
-         </div>
-      )}
-
-      <div className="px-6 space-y-10 max-w-xl mx-auto relative z-10">
-         <div>
-            <h2 className="text-xl font-bold text-[var(--text-main)] tracking-tight mb-4 px-2">
-               {searchQuery ? 'Search Results' : 'Explore Items'}
-            </h2>
-            <div className="grid gap-4">
-              {filteredCatalog.map(item => (
-                <CatalogItem key={item.id} item={item} cart={cart} updateCart={updateCart} shops={shops} />
-              ))}
-              {filteredCatalog.length === 0 && (
-                <p className="text-[var(--text-muted)] text-sm px-2 text-center mt-8">No items found.</p>
-              )}
-            </div>
-          </div>
+      <div className="px-6 space-y-4 max-w-xl mx-auto relative z-10">
+        {filteredCatalog.map(item => (
+          <CatalogItem key={item.id} item={item} cart={cart} updateCart={updateCart} />
+        ))}
+        {filteredCatalog.length === 0 && (
+          <p className="text-[var(--text-muted)] text-sm px-2 text-center mt-8">No items found.</p>
+        )}
       </div>
 
       <AnimatePresence>

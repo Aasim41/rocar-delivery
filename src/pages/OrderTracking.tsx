@@ -7,7 +7,7 @@ import emailjs from '@emailjs/browser';
 import { supabase } from '../lib/supabase';
 
 const STATUS_STEPS = [
-  { id: 'pending', label: 'Order Placed', desc: 'Waiting for shopkeeper to pack items', icon: Package },
+  { id: 'at_pickup', label: 'Order Placed', desc: 'Waiting for shopkeeper to pack items', icon: Package },
   { id: 'dispatched', label: 'Dispatched', desc: 'Shopkeeper packed items, bot is moving', icon: Truck },
   { id: 'en_route', label: 'En Route', desc: 'Robot is navigating to you', icon: Navigation2 },
   { id: 'arrived', label: 'Arrived', desc: 'Robot has arrived at your location', icon: MapPin },
@@ -30,7 +30,7 @@ export function OrderTracking() {
   const [showNotification, setShowNotification] = useState(false);
   const emailSentRef = useRef(false);
 
-  const [dbStatus, setDbStatus] = useState('pending');
+  const [dbStatus, setDbStatus] = useState('at_pickup');
 
   useEffect(() => {
     if (!id) return;
@@ -48,7 +48,7 @@ export function OrderTracking() {
   }, [id]);
 
   useEffect(() => {
-    if (dbStatus === 'pending') {
+    if (dbStatus === 'at_pickup') {
       setCurrentStatus(0);
     } else if (dbStatus === 'dispatched' && currentStatus < 1) {
       setCurrentStatus(1);

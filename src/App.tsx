@@ -6,6 +6,7 @@ import { Marketplace } from './pages/Marketplace';
 import { OrderTracking } from './pages/OrderTracking';
 import { Login } from './pages/Login';
 import { ShopPortal } from './pages/ShopPortal';
+import { ShopPage } from './pages/ShopPage';
 import { Profile } from './pages/Profile';
 import { supabase } from './lib/supabase';
 import { registerPushNotifications, initPushNotificationListeners } from './lib/pushNotifications';
@@ -167,6 +168,7 @@ function AppRoutes() {
           <Route path="/login" element={<Login />} />
           <Route path="/shop-portal" element={<ShopPortal />} />
           <Route path="/" element={<Marketplace />} />
+          <Route path="/shop/:shopId" element={<ShopPage />} />
           <Route path="/tracking/:id" element={<OrderTracking />} />
           <Route path="/profile" element={<Profile />} />
         </Routes>

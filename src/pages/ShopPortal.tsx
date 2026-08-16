@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, PackageSearch, LogOut } from 'lucide-react';
+import { Plus, PackageSearch, LogOut, MapPin, Store } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { WaveInput } from '../components/WaveInput';
+import { AddressModal, type SavedLocation } from '../components/AddressModal';
 
-// No longer using hardcoded inventory, fetching from Supabase
 
 export function ShopPortal() {
   const [inventory, setInventory] = useState<any[]>([]);
@@ -13,26 +13,105 @@ export function ShopPortal() {
   const [newItem, setNewItem] = useState({ name: '', category: 'Medicines', weight: 0, price: 0, quantity: 0 });
   const [activeTab, setActiveTab] = useState<'inventory' | 'orders'>('orders');
 
+  // Shop Onboarding State
+  const [hasShop, setHasShop] = useState<boolean | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [shopSetup, setShopSetup] = useState({
+    name: '',
+    banner_url: '',
+    categories: '',
+    whatsapp_number: '',
+  });
+  const [shopLocation, setShopLocation] = useState<SavedLocation | null>(null);
+  const [showAddressModal, setShowAddressModal] = useState(false);
+
   useEffect(() => {
-    fetchInventory();
+    checkShopStatus();
   }, []);
 
-  const fetchInventory = async () => {
-    const { data } = await supabase.from('items').select('*').order('name');
-    if (data) setInventory(data);
-    
-    // Also fetch active orders
+  const checkShopStatus = async () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (session) {
+      setUserId(session.user.id);
       const { data: userData } = await supabase.from('users').select('shop_id').eq('id', session.user.id).single();
+      
       if (userData?.shop_id) {
-        const { data: ordersData } = await supabase.from('orders')
-          .select('*')
-          .eq('shop_id', userData.shop_id)
-          .eq('status', 'pending')
-          .order('created_at', { ascending: false });
-        if (ordersData) setOrders(ordersData);
+        setHasShop(true);
+        fetchInventory(userData.shop_id);
+      } else {
+        setHasShop(false);
       }
+    }
+  };
+
+  const fetchInventory = async (shopId: string) => {
+    const { data } = await supabase.from('items').select('*').eq('shop_id', shopId).order('name');
+    if (data) setInventory(data);
+    
+    const { data: ordersData } = await supabase.from('orders')
+      .select('*')
+      .eq('shop_id', shopId)
+      .eq('status', 'at_pickup')
+      .order('created_at', { ascending: false });
+    if (ordersData) setOrders(ordersData);
+
+    const channel = supabase
+      .channel('orders-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          if (payload.new.status === 'at_pickup' && payload.new.shop_id === shopId) {
+            setOrders(prev => [payload.new, ...prev]);
+          }
+        } else if (payload.eventType === 'UPDATE') {
+          if (payload.new.status !== 'at_pickup') {
+            setOrders(prev => prev.filter(o => o.id !== payload.new.id));
+          }
+        } else if (payload.eventType === 'DELETE') {
+          setOrders(prev => prev.filter(o => o.id !== payload.old.id));
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setShopSetup(prev => ({ ...prev, banner_url: reader.result as string }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleCreateShop = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!userId || !shopLocation) return;
+
+    const categoriesArray = shopSetup.categories.split(',').map(s => s.trim()).filter(s => s);
+
+    const { data: newShop, error: shopError } = await supabase.from('shops').insert([{ 
+      name: shopSetup.name, 
+      banner_url: shopSetup.banner_url,
+      categories: categoriesArray,
+      whatsapp_number: shopSetup.whatsapp_number,
+      lat: shopLocation.lat,
+      lng: shopLocation.lng
+    }]).select().single();
+    
+    if (shopError) {
+      alert("Failed to create shop: " + shopError.message);
+      return;
+    }
+    
+    if (newShop) {
+      await supabase.from('users').update({ shop_id: newShop.id }).eq('id', userId);
+      setHasShop(true);
+      fetchInventory(newShop.id);
     }
   };
 
@@ -41,7 +120,6 @@ export function ShopPortal() {
   };
 
   const updateItem = async (id: string, field: string, value: any) => {
-    // Optimistic update for snappy UI
     setInventory(prev => prev.map(item => 
       item.id === id ? { ...item, [field]: value } : item
     ));
@@ -54,42 +132,24 @@ export function ShopPortal() {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
 
-    // Check if the user has a shop linked
     const { data: userData } = await supabase.from('users').select('shop_id').eq('id', session.user.id).single();
-    let shopId = userData?.shop_id;
-    
-    // Automatically create a shop if they don't have one
-    if (!shopId) {
-       const { data: newShop, error: shopError } = await supabase.from('shops').insert([{ 
-           name: "Campus Shop", 
-           whatsapp_number: "0000000000" 
-       }]).select().single();
-       
-       if (newShop) {
-           shopId = newShop.id;
-           await supabase.from('users').update({ shop_id: shopId }).eq('id', session.user.id);
-       } else {
-           alert("Failed to create a shop automatically: " + shopError?.message);
-           return;
-       }
-    }
+    if (!userData?.shop_id) return;
 
     const itemToInsert = {
       name: newItem.name,
       category: newItem.category,
-      weight: newItem.weight, // Send both to satisfy legacy databases
+      weight: newItem.weight,
       weight_grams: newItem.weight, 
       price: newItem.price,
       quantity: newItem.quantity,
       in_stock: newItem.quantity > 0,
-      shop_id: shopId
+      shop_id: userData.shop_id
     };
     
     const { data, error } = await supabase.from('items').insert([itemToInsert]).select().single();
     
     if (error) {
       alert("Failed to save item: " + error.message);
-      console.error(error);
       return;
     }
     
@@ -103,10 +163,8 @@ export function ShopPortal() {
 
   const handlePackOrder = async (orderId: string) => {
     try {
-      // 1. Mark in Supabase
       await supabase.from('orders').update({ status: 'dispatched' }).eq('id', orderId);
       
-      // 2. Trigger Python Backend
       const backendUrl = localStorage.getItem('BACKEND_URL') || 'http://localhost:8000';
       const res = await fetch(`${backendUrl}/backend/pack_order`, {
         method: 'POST'
@@ -116,7 +174,6 @@ export function ShopPortal() {
          console.warn("Backend might not be awaiting packing or offline");
       }
       
-      // 3. Remove from UI
       setOrders(prev => prev.filter(o => o.id !== orderId));
       alert("Order Packed! Cargo locked and bot is starting its journey to the customer.");
     } catch (e) {
@@ -125,12 +182,81 @@ export function ShopPortal() {
     }
   };
 
+  if (hasShop === null) {
+    return <div className="min-h-screen bg-slate-50 flex items-center justify-center">Loading...</div>;
+  }
+
+  if (hasShop === false) {
+    return (
+      <div className="min-h-screen bg-slate-50 pb-24 font-sans flex items-center justify-center p-6">
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
+          className="bg-white rounded-3xl shadow-xl w-full max-w-lg overflow-hidden border border-slate-100"
+        >
+          <div className="bg-slate-900 p-8 text-center text-white">
+            <Store className="w-12 h-12 mx-auto mb-4 text-emerald-400" />
+            <h1 className="text-2xl font-bold tracking-tight">Set up your Shop</h1>
+            <p className="text-slate-400 mt-2 text-sm">Welcome! Let's get your store online.</p>
+          </div>
+          
+          <form onSubmit={handleCreateShop} className="p-8 space-y-5">
+            <WaveInput required type="text" label="Shop Name" value={shopSetup.name} onChange={e => setShopSetup({...shopSetup, name: e.target.value})} />
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">Shop Banner</label>
+              <input type="file" accept="image/*" onChange={handleImageUpload} className="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100" />
+              {shopSetup.banner_url && <img src={shopSetup.banner_url} alt="Banner Preview" className="mt-2 h-20 w-auto rounded-lg object-cover" />}
+            </div>
+            <WaveInput required type="text" label="Categories (Comma separated)" value={shopSetup.categories} onChange={e => setShopSetup({...shopSetup, categories: e.target.value})} />
+            <WaveInput required type="tel" label="WhatsApp Number" value={shopSetup.whatsapp_number} onChange={e => setShopSetup({...shopSetup, whatsapp_number: e.target.value})} />
+            
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">Shop Location</label>
+              <button
+                type="button"
+                onClick={() => setShowAddressModal(true)}
+                className="w-full flex items-center p-4 bg-slate-50 border border-slate-200 rounded-2xl hover:border-emerald-500 transition-all text-left"
+              >
+                <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center mr-4">
+                  <MapPin className="h-5 w-5 text-emerald-600" />
+                </div>
+                <div className="flex-1">
+                  {shopLocation ? (
+                    <>
+                      <p className="font-bold text-slate-900">{shopLocation.name}</p>
+                      <p className="text-xs text-slate-500 font-mono mt-0.5">{shopLocation.lat?.toFixed(5)}, {shopLocation.lng?.toFixed(5)}</p>
+                    </>
+                  ) : (
+                    <p className="text-slate-500 font-medium text-sm">Tap to pin on map...</p>
+                  )}
+                </div>
+              </button>
+            </div>
+
+            <button 
+              type="submit"
+              disabled={!shopLocation}
+              className="w-full bg-emerald-600 text-white font-bold py-4 rounded-xl shadow-md hover:bg-emerald-700 transition-colors disabled:opacity-50 mt-4"
+            >
+              Open Shop
+            </button>
+          </form>
+        </motion.div>
+
+        <AddressModal 
+          isOpen={showAddressModal}
+          onClose={() => setShowAddressModal(false)}
+          onSelect={setShopLocation}
+          title="Pin Shop Location"
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 pb-24 font-sans">
       <header className="bg-white border-b border-slate-200 px-6 py-4 sticky top-0 z-20 flex justify-between items-center shadow-sm">
         <div>
           <h1 className="text-xl font-bold text-slate-900 tracking-tight">Shop Portal</h1>
-          <p className="text-xs text-slate-500 font-medium uppercase tracking-wider mt-1">Campus Pharmacy</p>
         </div>
         <button 
           onClick={handleLogout}
@@ -188,6 +314,8 @@ export function ShopPortal() {
                   <select value={newItem.category} onChange={e => setNewItem({...newItem, category: e.target.value})} className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:border-emerald-500 bg-white text-slate-900">
                     <option>Medicines</option>
                     <option>Food & Drinks</option>
+                    <option>Electronics</option>
+                    <option>Groceries</option>
                   </select>
                 </div>
                 <div className="pt-4">

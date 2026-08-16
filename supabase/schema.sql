@@ -22,6 +22,8 @@ create type user_role as enum ('buyer', 'shop_owner');
 create table public.shops (
     id uuid default gen_random_uuid() primary key,
     name text not null,
+    banner_url text,
+    categories text[],
     lat double precision,
     lng double precision,
     whatsapp_number text not null,
@@ -45,6 +47,8 @@ create table public.items (
     id uuid default gen_random_uuid() primary key,
     shop_id uuid references public.shops(id) on delete cascade not null,
     name text not null,
+    banner_url text,
+    categories text[],
     category text not null,
     weight_grams integer not null,
     price numeric(10, 2) not null,
