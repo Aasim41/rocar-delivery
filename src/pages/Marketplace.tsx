@@ -142,7 +142,7 @@ export function Marketplace() {
       const orderData = {
         user_id: session.user.id,
         shop_id: shopId,
-        status: 'dispatched',
+        status: 'pending',
         total_weight_grams: cartTotalWeight,
         items: Object.entries(cart).map(([id, qty]) => {
           const item = catalog.find(i => i.id === id);

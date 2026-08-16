@@ -29,7 +29,7 @@ export function ShopPortal() {
         const { data: ordersData } = await supabase.from('orders')
           .select('*')
           .eq('shop_id', userData.shop_id)
-          .eq('status', 'dispatched')
+          .eq('status', 'pending')
           .order('created_at', { ascending: false });
         if (ordersData) setOrders(ordersData);
       }
@@ -104,7 +104,7 @@ export function ShopPortal() {
   const handlePackOrder = async (orderId: string) => {
     try {
       // 1. Mark in Supabase
-      await supabase.from('orders').update({ status: 'packed' }).eq('id', orderId);
+      await supabase.from('orders').update({ status: 'dispatched' }).eq('id', orderId);
       
       // 2. Trigger Python Backend
       const backendUrl = localStorage.getItem('BACKEND_URL') || 'http://localhost:8000';

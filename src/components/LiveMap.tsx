@@ -40,9 +40,10 @@ interface LiveMapProps {
   dropLng: number;
   currentLat?: number;
   currentLng?: number;
+  isMoving?: boolean;
 }
 
-export function LiveMap({ startLat, startLng, dropLat, dropLng, currentLat, currentLng }: LiveMapProps) {
+export function LiveMap({ startLat, startLng, dropLat, dropLng, currentLat, currentLng, isMoving }: LiveMapProps) {
   const isDark = useIsDark();
   const mapRef = useRef<google.maps.Map | null>(null);
   const [robotPos, setRobotPos] = useState<{ lat: number; lng: number }>({
@@ -123,7 +124,7 @@ export function LiveMap({ startLat, startLng, dropLat, dropLng, currentLat, curr
       return;
     }
 
-    if (routePath.length === 0) return;
+    if (routePath.length === 0 || isMoving === false) return;
 
     let step = 0;
     const interval = setInterval(() => {
@@ -145,7 +146,7 @@ export function LiveMap({ startLat, startLng, dropLat, dropLng, currentLat, curr
     }, 1000); // Move every 1 second
 
     return () => clearInterval(interval);
-  }, [routePath, currentLat, currentLng]);
+  }, [routePath, currentLat, currentLng, isMoving]);
 
   const onLoad = useCallback(
     (map: google.maps.Map) => {

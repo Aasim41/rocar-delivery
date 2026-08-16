@@ -1,15 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
-import { Clock, ArrowLeft, Lock, Unlock, Loader2, Bell, Truck, Package, MapPin, Navigation2, Check } from 'lucide-react';
+import { Clock, ArrowLeft, Lock, Unlock, Loader2, Bell, Truck, Package, MapPin, Navigation2 } from 'lucide-react';
 import { LiveMap } from '../components/LiveMap';
 import { motion, AnimatePresence } from 'framer-motion';
 import emailjs from '@emailjs/browser';
 import { supabase } from '../lib/supabase';
 
 const STATUS_STEPS = [
-  { id: 'dispatched', label: 'Dispatched', desc: 'Robot is on the way to pickup', icon: Truck },
-  { id: 'at_pickup', label: 'At Pickup', desc: 'Waiting for items to be loaded', icon: Package },
-  { id: 'picked_up', label: 'Picked Up', desc: 'Items loaded successfully', icon: Check },
+  { id: 'pending', label: 'Order Placed', desc: 'Waiting for shopkeeper to pack items', icon: Package },
+  { id: 'dispatched', label: 'Dispatched', desc: 'Shopkeeper packed items, bot is moving', icon: Truck },
   { id: 'en_route', label: 'En Route', desc: 'Robot is navigating to you', icon: Navigation2 },
   { id: 'arrived', label: 'Arrived', desc: 'Robot has arrived at your location', icon: MapPin },
 ];
@@ -31,16 +30,39 @@ export function OrderTracking() {
   const [showNotification, setShowNotification] = useState(false);
   const emailSentRef = useRef(false);
 
+  const [dbStatus, setDbStatus] = useState('pending');
+
   useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentStatus(prev => {
-        if (prev < STATUS_STEPS.length - 1) return prev + 1;
-        clearInterval(interval);
-        return prev;
-      });
-    }, 4000); // Fast simulation
-    return () => clearInterval(interval);
-  }, []);
+    if (!id) return;
+    
+    supabase.from('orders').select('status').eq('id', id).single().then(({data}) => {
+      if (data) setDbStatus(data.status);
+    });
+    
+    const channel = supabase.channel(`order-${id}`)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders', filter: `id=eq.${id}` }, (payload) => {
+        setDbStatus(payload.new.status);
+      }).subscribe();
+      
+    return () => { supabase.removeChannel(channel); };
+  }, [id]);
+
+  useEffect(() => {
+    if (dbStatus === 'pending') {
+      setCurrentStatus(0);
+    } else if (dbStatus === 'dispatched' && currentStatus < 1) {
+      setCurrentStatus(1);
+    }
+  }, [dbStatus]);
+
+  useEffect(() => {
+    if (currentStatus >= 1 && currentStatus < STATUS_STEPS.length - 1) {
+      const interval = setInterval(() => {
+        setCurrentStatus(prev => prev + 1);
+      }, 6000); // 6s per step
+      return () => clearInterval(interval);
+    }
+  }, [currentStatus]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -51,7 +73,7 @@ export function OrderTracking() {
 
   // When arrived, generate in-app notification and trigger EmailJS
   useEffect(() => {
-    if (currentStatus === 4 && !emailSentRef.current) {
+    if (currentStatus === 3 && !emailSentRef.current) {
       emailSentRef.current = true;
       setShowNotification(true);
       
@@ -116,7 +138,7 @@ export function OrderTracking() {
       // Auto-hide the popup notification after 8 seconds so it doesn't block UI forever
       setTimeout(() => setShowNotification(false), 8000);
     }
-  }, [currentStatus]);
+  }, [currentStatus, id]);
 
   const handleUnlock = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -276,6 +298,7 @@ export function OrderTracking() {
           startLng={startCoords.lng}
           dropLat={dropCoords.lat}
           dropLng={dropCoords.lng}
+          isMoving={currentStatus >= 1}
         />
       </div>
 
@@ -336,7 +359,7 @@ export function OrderTracking() {
 
         {/* OTP UNLOCK UI */}
         <AnimatePresence>
-          {currentStatus === 4 && (
+          {currentStatus === 3 && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
