@@ -1,13 +1,12 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { User, MapPin, Package, LogOut, Loader2, Edit2, Check, Clock, Moon, Sun, Settings, Trash2, ArrowLeft } from 'lucide-react';
+import { User, MapPin, Package, LogOut, Loader2, Edit2, Check, Moon, Sun, Settings, Trash2, ArrowLeft } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 
 export function Profile() {
   const [session, setSession] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
-  const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDarkMode, setIsDarkMode] = useState(false);
   
@@ -41,14 +40,12 @@ export function Profile() {
     if (session) {
       if (session.user.id === 'demo-user-123') {
         setProfile({ name: 'Demo User', saved_locations: [{ name: 'North Campus Dorm' }] });
-        setOrders([]);
         setLoading(false);
         return;
       }
 
-      const [profileRes, ordersRes] = await Promise.all([
-        supabase.from('users').select('*').eq('id', session.user.id).single(),
-        supabase.from('orders').select('*').eq('user_id', session.user.id).order('created_at', { ascending: false })
+      const [profileRes] = await Promise.all([
+        supabase.from('users').select('*').eq('id', session.user.id).single()
       ]);
       
       if (profileRes.data) {
@@ -56,7 +53,6 @@ export function Profile() {
         setEditName(profileRes.data.name || '');
         setEditAge(profileRes.data.age || '');
       }
-      if (ordersRes.data) setOrders(ordersRes.data);
     }
     setLoading(false);
   };

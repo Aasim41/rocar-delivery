@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, PackageSearch, LogOut, MapPin, Store, Settings, X } from 'lucide-react';
+import { Plus, PackageSearch, LogOut, MapPin, Store, Settings, X, Star } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { supabase } from '../lib/supabase';
 import { WaveInput } from '../components/WaveInput';
@@ -556,6 +556,25 @@ export function ShopPortal() {
                       ))}
                     </ul>
                   </div>
+                  
+                  {order.rating && (
+                    <div className="bg-[var(--color-yellow)]/5 rounded-xl p-4 mt-4 border border-[var(--color-yellow)]/10">
+                      <div className="flex items-center space-x-1 mb-2">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <Star 
+                            key={star} 
+                            className={`w-4 h-4 ${star <= order.rating ? 'fill-[var(--color-yellow)] text-[var(--color-yellow)]' : 'text-[var(--text-muted)] opacity-30'}`} 
+                          />
+                        ))}
+                        <span className="text-xs font-bold text-[var(--color-yellow)] ml-2">
+                          {order.rating}/5
+                        </span>
+                      </div>
+                      {order.feedback && (
+                        <p className="text-sm text-[var(--text-main)] italic">"{order.feedback}"</p>
+                      )}
+                    </div>
+                  )}
                 </motion.div>
               ))
             )}

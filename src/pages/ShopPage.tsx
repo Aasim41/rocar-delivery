@@ -6,6 +6,7 @@ import { LocationMap } from '../components/LocationMap';
 import { AddressModal, type SavedLocation } from '../components/AddressModal';
 import { supabase } from '../lib/supabase';
 import { WaveInput } from '../components/WaveInput';
+import toast from 'react-hot-toast';
 
 const MAX_PAYLOAD_GRAMS = 2000;
 
@@ -163,6 +164,7 @@ export function ShopPage() {
           console.log("Fetching backend...");
           fetch(`${backendUrl}/backend/coordinates/destinations`, {
               method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                   kart: { latitude: startLat, longitude: startLng, heading: 0 },
                   marketplace: { latitude: startLat, longitude: startLng },

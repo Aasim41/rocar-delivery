@@ -46,10 +46,16 @@ interface LiveMapProps {
 export function LiveMap({ startLat, startLng, dropLat, dropLng, currentLat, currentLng, isMoving }: LiveMapProps) {
   const isDark = useIsDark();
   const mapRef = useRef<google.maps.Map | null>(null);
-  const [robotPos, setRobotPos] = useState<{ lat: number; lng: number }>({
+  const [robotPos, _setRobotPos] = useState<{ lat: number; lng: number }>({
     lat: currentLat || startLat,
     lng: currentLng || startLng,
   });
+  const robotPosRef = useRef(robotPos);
+  
+  const setRobotPos = useCallback((pos: {lat: number, lng: number}) => {
+    robotPosRef.current = pos;
+    _setRobotPos(pos);
+  }, []);
 
   const { isLoaded } = useJsApiLoader({
     googleMapsApiKey: GOOGLE_MAPS_API_KEY,
@@ -117,12 +123,40 @@ export function LiveMap({ startLat, startLng, dropLat, dropLng, currentLat, curr
     );
   }, [isLoaded, startLat, startLng, dropLat, dropLng]);
 
-  // Simulate movement along the road path
+  // Real GPS Lerp Animation
   useEffect(() => {
-    if (currentLat && currentLng) {
-      setRobotPos({ lat: currentLat, lng: currentLng });
-      return;
-    }
+    if (!currentLat || !currentLng) return;
+    
+    // Lerp from current robotPosRef to the new currentLat/currentLng over ~1.8 seconds
+    // to provide smooth movement between the 2 second GPS polling intervals.
+    let startTime: number | null = null;
+    const startPos = { ...robotPosRef.current };
+    let animationFrame: number;
+    
+    const animate = (time: number) => {
+      if (!startTime) startTime = time;
+      const progress = Math.min((time - startTime) / 1800, 1);
+      
+      // Easing function for smoother movement
+      const easeProgress = progress < 0.5 ? 2 * progress * progress : -1 + (4 - 2 * progress) * progress;
+      
+      setRobotPos({
+        lat: startPos.lat + (currentLat - startPos.lat) * easeProgress,
+        lng: startPos.lng + (currentLng - startPos.lng) * easeProgress
+      });
+      
+      if (progress < 1) {
+        animationFrame = requestAnimationFrame(animate);
+      }
+    };
+    
+    animationFrame = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(animationFrame);
+  }, [currentLat, currentLng, setRobotPos]);
+
+  // Simulate movement along the road path (Fallback when no real GPS)
+  useEffect(() => {
+    if (currentLat && currentLng) return; // Disable simulation if real GPS is active
 
     if (routePath.length === 0 || isMoving === false) return;
 
@@ -142,6 +176,7 @@ export function LiveMap({ startLat, startLng, dropLat, dropLng, currentLat, curr
         const backendUrl = localStorage.getItem('BACKEND_URL') || 'http://localhost:8000';
         fetch(`${backendUrl}/backend/coordinates/live`, {
           method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ latitude: pos.lat, longitude: pos.lng })
         }).catch(err => console.log("Dash map link failed:", err));
       }

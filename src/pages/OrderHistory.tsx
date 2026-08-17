@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Package, Clock, ArrowLeft, Loader2, MapPin } from 'lucide-react';
+import { Package, Clock, ArrowLeft, Loader2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 
 export function OrderHistory() {
-  const [session, setSession] = useState<any>(null);
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
@@ -18,7 +17,6 @@ export function OrderHistory() {
   const fetchData = async () => {
     setLoading(true);
     const { data: { session } } = await supabase.auth.getSession();
-    setSession(session);
 
     if (session) {
       if (session.user.id === 'demo-user-123') {

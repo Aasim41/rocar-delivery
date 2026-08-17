@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
-import { Clock, ArrowLeft, Lock, Unlock, Loader2, Bell, Truck, Package, MapPin, Navigation2 } from 'lucide-react';
+import { Clock, ArrowLeft, Lock, Unlock, Loader2, Bell, Truck, Package, MapPin, Navigation2, Star } from 'lucide-react';
 import { LiveMap } from '../components/LiveMap';
+import { RatingModal } from '../components/RatingModal';
 import { motion, AnimatePresence } from 'framer-motion';
 import emailjs from '@emailjs/browser';
 import { supabase } from '../lib/supabase';
@@ -13,6 +14,26 @@ const STATUS_STEPS = [
   { id: 'arrived', label: 'Arrived', desc: 'Robot has arrived at your location', icon: MapPin },
 ];
 
+// Haversine distance in meters
+function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371000;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+// Map backend active_phase to our status index
+function phaseToStatusIndex(phase: string): number {
+  switch (phase) {
+    case 'IDLE': return 0;
+    case 'PICKUP': return 1;
+    case 'AWAITING_PACKING': return 0;
+    case 'DELIVERY': return 2;
+    default: return 0;
+  }
+}
+
 export function OrderTracking() {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
@@ -20,7 +41,7 @@ export function OrderTracking() {
   const type = searchParams.get('type') || 'parcel';
   
   const [currentStatus, setCurrentStatus] = useState(0);
-  const [eta, setEta] = useState(20); // shortened for hackathon demo
+  const [eta, setEta] = useState<number | null>(null);
   
   const [otp, setOtp] = useState('');
   const [expectedOtp, setExpectedOtp] = useState('1234');
@@ -29,9 +50,21 @@ export function OrderTracking() {
   const [error, setError] = useState('');
   const [showNotification, setShowNotification] = useState(false);
   const emailSentRef = useRef(false);
+  
+  // Real GPS position from backend
+  const [botLat, setBotLat] = useState<number | undefined>(undefined);
+  const [botLng, setBotLng] = useState<number | undefined>(undefined);
+  
+  // Speed tracking for ETA
+  const prevPositionRef = useRef<{lat: number, lng: number, time: number} | null>(null);
+  const speedSamplesRef = useRef<number[]>([]);
 
+  // Rating
+  const [showRating, setShowRating] = useState(false);
+  
   const [dbStatus, setDbStatus] = useState('at_pickup');
 
+  // 1. Subscribe to Supabase order status changes
   useEffect(() => {
     if (!id) return;
     
@@ -47,62 +80,151 @@ export function OrderTracking() {
     return () => { supabase.removeChannel(channel); };
   }, [id]);
 
+  // 2. Sync DB status to our status index (for at_pickup and dispatched transitions)
   useEffect(() => {
     if (dbStatus === 'at_pickup') {
       setCurrentStatus(0);
     } else if (dbStatus === 'dispatched' && currentStatus < 1) {
       setCurrentStatus(1);
+    } else if (dbStatus === 'arrived') {
+      setCurrentStatus(3);
     }
   }, [dbStatus]);
 
+  // 3. Poll backend for real GPS position & active_phase (replaces fake 6s timer)
   useEffect(() => {
-    if (currentStatus >= 1 && currentStatus < STATUS_STEPS.length - 1) {
-      const interval = setInterval(() => {
-        setCurrentStatus(prev => prev + 1);
-      }, 6000); // 6s per step
-      return () => clearInterval(interval);
-    }
+    if (currentStatus < 1) return; // Don't poll until order is dispatched
+    
+    const pollBackend = async () => {
+      try {
+        const backendUrl = localStorage.getItem('BACKEND_URL') || 'http://localhost:8000';
+        const res = await fetch(`${backendUrl}/status`);
+        if (!res.ok) return;
+        const data = await res.json();
+        
+        // Update bot position from backend GPS
+        if (data.map_data?.live_location) {
+          const newLat = data.map_data.live_location.lat;
+          const newLng = data.map_data.live_location.lng;
+          
+          if (newLat && newLng && (newLat !== 0 || newLng !== 0)) {
+            setBotLat(newLat);
+            setBotLng(newLng);
+            
+            // Calculate speed for ETA
+            const now = Date.now();
+            if (prevPositionRef.current) {
+              const dt = (now - prevPositionRef.current.time) / 1000; // seconds
+              if (dt > 0.5) {
+                const dist = haversineDistance(prevPositionRef.current.lat, prevPositionRef.current.lng, newLat, newLng);
+                const speed = dist / dt; // m/s
+                if (speed > 0.1 && speed < 50) { // Reasonable speed range
+                  speedSamplesRef.current.push(speed);
+                  if (speedSamplesRef.current.length > 10) speedSamplesRef.current.shift();
+                }
+              }
+            }
+            prevPositionRef.current = { lat: newLat, lng: newLng, time: now };
+          }
+        }
+        
+        // Update status from backend's active_phase (Option C)
+        if (data.active_phase) {
+          const backendStatusIdx = phaseToStatusIndex(data.active_phase);
+          // Only advance status, never go backwards (except for IDLE which is handled by arrival)
+          if (backendStatusIdx > currentStatus && backendStatusIdx <= 2) {
+            setCurrentStatus(backendStatusIdx);
+          }
+          // If backend says IDLE and we're in DELIVERY phase, bot has arrived
+          if (data.active_phase === 'IDLE' && currentStatus >= 2) {
+            setCurrentStatus(3);
+          }
+        }
+      } catch (e) {
+        // Backend unreachable — that's fine, we'll keep using Supabase status
+        console.log('Backend poll failed:', e);
+      }
+    };
+    
+    pollBackend(); // Initial fetch
+    const interval = setInterval(pollBackend, 2000); // Poll every 2 seconds
+    return () => clearInterval(interval);
   }, [currentStatus]);
 
+  // 4. Calculate real ETA based on distance and speed
   useEffect(() => {
-    const interval = setInterval(() => {
-      setEta(prev => Math.max(0, prev - 1));
-    }, 1000);
-    return () => clearInterval(interval);
-  }, []);
+    if (!botLat || !botLng || currentStatus >= 3) {
+      return;
+    }
+    
+    const distRemaining = haversineDistance(botLat, botLng, dropCoords.lat, dropCoords.lng);
+    const avgSpeed = speedSamplesRef.current.length > 0
+      ? speedSamplesRef.current.reduce((a, b) => a + b, 0) / speedSamplesRef.current.length
+      : null;
+    
+    if (avgSpeed && avgSpeed > 0.1) {
+      const etaSeconds = Math.round(distRemaining / avgSpeed);
+      setEta(Math.min(etaSeconds, 3600)); // Cap at 1 hour
+    } else if (distRemaining < 50) {
+      setEta(0);
+    } else {
+      // Estimate with default walking speed (1.2 m/s for robot)
+      setEta(Math.round(distRemaining / 1.2));
+    }
+  }, [botLat, botLng, currentStatus]);
 
-  // When arrived, generate in-app notification and trigger EmailJS
+  // 5. Auto-detect arrival based on distance (backup for backend phase)
+  useEffect(() => {
+    if (!botLat || !botLng || currentStatus >= 3) return;
+    
+    const distToDrop = haversineDistance(botLat, botLng, dropCoords.lat, dropCoords.lng);
+    if (distToDrop < 50) { // Within 50 meters
+      setCurrentStatus(3);
+    }
+  }, [botLat, botLng, currentStatus]);
+
+  // 6. When arrived — push notification + email OTP
   useEffect(() => {
     if (currentStatus === 3 && !emailSentRef.current) {
       emailSentRef.current = true;
       setShowNotification(true);
+      setEta(0);
       
-      // Auto-trigger Database Webhook for Native Push Notification
-      if (id) {
-        supabase.from('orders').update({ status: 'arrived' }).eq('id', id).then(({error}) => {
-          if (error) console.error("Failed to automatically update order to arrived:", error);
-          else console.log("Order automatically updated to 'arrived' in DB via GPS simulation!");
+      // Send browser push notification
+      if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification('🤖 Robot Arrived!', {
+          body: 'Your delivery robot has arrived. Check your email for the unlock PIN.',
+          icon: '/vite.svg',
+        });
+      } else if ('Notification' in window && Notification.permission !== 'denied') {
+        Notification.requestPermission().then(perm => {
+          if (perm === 'granted') {
+            new Notification('🤖 Robot Arrived!', {
+              body: 'Your delivery robot has arrived. Check your email for the unlock PIN.',
+              icon: '/vite.svg',
+            });
+          }
         });
       }
       
+      // Update DB status
+      if (id) {
+        supabase.from('orders').update({ status: 'arrived' }).eq('id', id).then(({error}) => {
+          if (error) console.error("Failed to update order to arrived:", error);
+        });
+      }
+      
+      // Send email with OTP
       const triggerEmail = async () => {
         try {
           const { data: { session } } = await supabase.auth.getSession();
           const userEmail = session?.user?.email || localStorage.getItem('onboarding_email') || 'test@example.com';
           const generatedPin = Math.floor(1000 + Math.random() * 9000).toString();
           
-          // NOTE: Push Notifications via Firebase Cloud Messaging (FCM)
-          // In a production environment, you would have a Supabase Edge Function 
-          // that listens for changes to the 'orders' table. When an order status 
-          // changes to 'arrived', the Edge Function will securely query the user's 
-          // 'push_token' and trigger an FCM push notification directly to their phone.
-          
-          // IMPORTANT: Replace these with your actual EmailJS keys!
           const serviceId: string = 'service_w7qmwoa';
           const templateId: string = 'template_8lkn1x9';
           const publicKey: string = '3MGHBwZxoOMrzO-gV';
 
-          // Prevent crashing if keys aren't set yet during demo
           if (serviceId === 'YOUR_SERVICE_ID') {
             console.warn("EmailJS keys not set. Falling back to default PIN 1234.");
             setExpectedOtp("1234");
@@ -111,8 +233,8 @@ export function OrderTracking() {
 
           const templateParams = {
             to_email: userEmail,
-            passcode: generatedPin, // Matches {{passcode}} in their template
-            time: new Date(Date.now() + 15 * 60000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), // Matches {{time}}
+            passcode: generatedPin,
+            time: new Date(Date.now() + 15 * 60000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
             message: `Your Delivery Robot has arrived! Use PIN: ${generatedPin} to unlock your compartment.`
           };
 
@@ -125,17 +247,15 @@ export function OrderTracking() {
             console.log("Email Sent Successfully!");
           } else {
             console.error("EmailJS failed:", response);
-            setExpectedOtp("1234"); // Fallback
+            setExpectedOtp("1234");
           }
         } catch (err) {
           console.error("Failed to invoke EmailJS:", err);
-          setExpectedOtp("1234"); // Fallback
+          setExpectedOtp("1234");
         }
       };
 
       triggerEmail();
-      
-      // Auto-hide the popup notification after 8 seconds so it doesn't block UI forever
       setTimeout(() => setShowNotification(false), 8000);
     }
   }, [currentStatus, id]);
@@ -148,9 +268,9 @@ export function OrderTracking() {
     try {
       if (otp === expectedOtp) {
         const backendUrl = localStorage.getItem('BACKEND_URL') || 'http://localhost:8000';
-        // Send the unlock command to the Python Cart API
         const response = await fetch(`${backendUrl}/backend/unlock`, {
           method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ action: 'unlock' })
         });
         
@@ -170,10 +290,25 @@ export function OrderTracking() {
     }
   };
 
-  const formatETA = (seconds: number) => {
+  const handleRatingSubmit = async (rating: number, feedback: string) => {
+    if (id) {
+      await supabase.from('orders').update({ 
+        rating, 
+        feedback,
+        status: 'delivered' 
+      }).eq('id', id);
+    }
+    setShowRating(false);
+    navigate('/');
+  };
+
+  const formatETA = (seconds: number | null) => {
+    if (seconds === null) return 'Calculating...';
+    if (seconds === 0) return 'Arrived!';
     const m = Math.floor(seconds / 60);
     const s = seconds % 60;
-    return `${m}m ${s}s`;
+    if (m > 0) return `${m}m ${s}s`;
+    return `${s}s`;
   };
 
   const startCoords = { 
@@ -185,6 +320,7 @@ export function OrderTracking() {
     lng: parseFloat(searchParams.get('dropLng') || '77.3110') 
   };
 
+  // ─── Unlocked Success Screen ───
   if (isUnlocked) {
     return (
       <div className="h-screen bg-[var(--bg-page)] flex flex-col items-center justify-center p-6 font-sans relative overflow-hidden">
@@ -241,12 +377,36 @@ export function OrderTracking() {
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.8, type: 'spring' }}
-            onClick={() => navigate('/')}
-            className="w-full minimal-button bg-[var(--color-green)] text-white py-4 text-lg shadow-xl hover:shadow-2xl hover:scale-[1.02] active:scale-95 transition-all"
+            onClick={() => setShowRating(true)}
+            className="w-full minimal-button bg-[var(--color-green)] text-white py-4 text-lg shadow-xl hover:shadow-2xl hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2"
           >
-            Finish Order
+            <Star className="w-5 h-5" /> Rate Your Delivery
+          </motion.button>
+          
+          <motion.button
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 1 }}
+            onClick={async () => {
+              if (id) {
+                await supabase.from('orders').update({ status: 'delivered' }).eq('id', id);
+              }
+              navigate('/');
+            }}
+            className="mt-3 text-[var(--text-muted)] text-sm font-medium hover:text-[var(--text-main)] transition-colors"
+          >
+            Skip & Go Home
           </motion.button>
         </motion.div>
+        
+        <RatingModal 
+          isOpen={showRating} 
+          onClose={() => {
+            setShowRating(false);
+            navigate('/');
+          }} 
+          onSubmit={handleRatingSubmit} 
+        />
       </div>
     );
   }
@@ -298,6 +458,8 @@ export function OrderTracking() {
           startLng={startCoords.lng}
           dropLat={dropCoords.lat}
           dropLng={dropCoords.lng}
+          currentLat={botLat}
+          currentLng={botLng}
           isMoving={currentStatus >= 1}
         />
       </div>

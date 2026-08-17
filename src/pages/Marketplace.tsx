@@ -4,6 +4,7 @@ import { ShoppingCart, Plus, Minus, AlertCircle, ArrowLeft, MapPin, Loader2, Use
 import { motion, AnimatePresence, useInView } from 'framer-motion';
 import { LocationMap } from '../components/LocationMap';
 import { AddressModal, type SavedLocation } from '../components/AddressModal';
+import toast from 'react-hot-toast';
 
 import { supabase } from '../lib/supabase';
 import { WaveInput } from '../components/WaveInput';
@@ -182,6 +183,7 @@ export function Marketplace() {
           console.log("Fetching backend...");
           fetch(`${backendUrl}/backend/coordinates/destinations`, {
               method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                   kart: { latitude: startLat, longitude: startLng, heading: 0 },
                   marketplace: { latitude: startLat, longitude: startLng },
