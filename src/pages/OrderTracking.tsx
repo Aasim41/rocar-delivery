@@ -147,7 +147,7 @@ export function OrderTracking() {
     };
     
     pollBackend(); // Initial fetch
-    const interval = setInterval(pollBackend, 2000); // Poll every 2 seconds
+    const interval = setInterval(pollBackend, 500); // Poll every 500ms
     return () => clearInterval(interval);
   }, [currentStatus]);
 

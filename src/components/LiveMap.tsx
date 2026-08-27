@@ -123,35 +123,10 @@ export function LiveMap({ startLat, startLng, dropLat, dropLng, currentLat, curr
     );
   }, [isLoaded, startLat, startLng, dropLat, dropLng]);
 
-  // Real GPS Lerp Animation
+  // Real GPS Instant Update
   useEffect(() => {
     if (!currentLat || !currentLng) return;
-    
-    // Lerp from current robotPosRef to the new currentLat/currentLng over ~1.8 seconds
-    // to provide smooth movement between the 2 second GPS polling intervals.
-    let startTime: number | null = null;
-    const startPos = { ...robotPosRef.current };
-    let animationFrame: number;
-    
-    const animate = (time: number) => {
-      if (!startTime) startTime = time;
-      const progress = Math.min((time - startTime) / 1800, 1);
-      
-      // Easing function for smoother movement
-      const easeProgress = progress < 0.5 ? 2 * progress * progress : -1 + (4 - 2 * progress) * progress;
-      
-      setRobotPos({
-        lat: startPos.lat + (currentLat - startPos.lat) * easeProgress,
-        lng: startPos.lng + (currentLng - startPos.lng) * easeProgress
-      });
-      
-      if (progress < 1) {
-        animationFrame = requestAnimationFrame(animate);
-      }
-    };
-    
-    animationFrame = requestAnimationFrame(animate);
-    return () => cancelAnimationFrame(animationFrame);
+    setRobotPos({ lat: currentLat, lng: currentLng });
   }, [currentLat, currentLng, setRobotPos]);
 
   // Simulate movement along the road path (Fallback when no real GPS)
