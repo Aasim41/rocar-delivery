@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { User, MapPin, Package, LogOut, Loader2, Edit2, Check, Moon, Sun, Settings, Trash2, ArrowLeft } from 'lucide-react';
+import { User, MapPin, Package, LogOut, Loader2, Edit2, Check, Moon, Sun, Settings, Trash2, ArrowLeft, Star } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 
@@ -249,7 +249,26 @@ export function Profile() {
             <p className="text-sm font-medium text-[var(--text-muted)]">View your past orders and receipts</p>
           </div>
           <div className="text-[var(--text-muted)]">
-            →
+            <LogOut className="w-5 h-5 rotate-180 opacity-0" />
+          </div>
+        </button>
+      </div>
+
+      {/* Reviews Link */}
+      <div className="mb-8 relative z-10">
+        <button 
+          onClick={() => navigate('/reviews')}
+          className="w-full glass-card flex items-center p-4 hover:border-yellow-500/50 transition-colors text-left"
+        >
+          <div className="w-12 h-12 bg-yellow-500/10 rounded-full flex items-center justify-center shrink-0 mr-4">
+            <Star className="w-6 h-6 text-yellow-500" />
+          </div>
+          <div className="flex-1">
+            <h3 className="font-bold text-lg text-[var(--text-main)]">My Reviews</h3>
+            <p className="text-sm font-medium text-[var(--text-muted)]">See your ratings and community reviews</p>
+          </div>
+          <div className="text-[var(--text-muted)]">
+            <LogOut className="w-5 h-5 rotate-180 opacity-0" />
           </div>
         </button>
       </div>

@@ -9,6 +9,7 @@ import { ShopPortal } from './pages/ShopPortal';
 import { ShopPage } from './pages/ShopPage';
 import { Profile } from './pages/Profile';
 import { OrderHistory } from './pages/OrderHistory';
+import { Reviews } from './pages/Reviews';
 import { supabase } from './lib/supabase';
 import { registerPushNotifications, initPushNotificationListeners } from './lib/pushNotifications';
 import { Loader2 } from 'lucide-react';
@@ -165,6 +166,7 @@ function AppRoutes() {
           <Route path="/tracking/:id" element={<OrderTracking />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/orders" element={<OrderHistory />} />
+          <Route path="/reviews" element={<Reviews />} />
         </Routes>
       </AnimatePresence>
     </>
