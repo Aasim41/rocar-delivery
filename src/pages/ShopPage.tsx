@@ -250,21 +250,6 @@ export function ShopPage() {
 
           <div className="glass-card p-6">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-bold text-[var(--text-main)]">Payment Method</h2>
-            </div>
-            <div className="grid grid-cols-2 gap-3 mb-6">
-              {['UPI', 'Credit Card', 'Cash on Delivery'].map((method) => (
-                <button
-                  key={method}
-                  type="button"
-                  onClick={() => (window as any).selectedPayment = method}
-                  className="p-3 border border-[var(--border-color)] rounded-xl text-sm font-semibold text-[var(--text-main)] hover:bg-[var(--color-primary)]/10 hover:border-[var(--color-primary)] transition-all focus:bg-[var(--color-primary)] focus:text-white"
-                >
-                  {method}
-                </button>
-              ))}
-            </div>
-            <div className="flex justify-between items-center mb-4">
               <h2 className="text-lg font-bold text-[var(--text-main)]">Delivery Details</h2>
             </div>
             <form id="checkout-form" onSubmit={handleCheckoutSubmit} className="space-y-4">
