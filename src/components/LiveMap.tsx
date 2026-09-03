@@ -52,6 +52,17 @@ export function LiveMap({ startLat, startLng, dropLat, dropLng, currentLat, curr
   });
   const robotPosRef = useRef(robotPos);
   
+  const [lineOffset, setLineOffset] = useState(0);
+
+  useEffect(() => {
+    let count = 0;
+    const interval = window.setInterval(() => {
+      count = (count + 1) % 200;
+      setLineOffset(count / 2); // 0 to 100
+    }, 50);
+    return () => window.clearInterval(interval);
+  }, []);
+
   const setRobotPos = useCallback((pos: {lat: number, lng: number}) => {
     robotPosRef.current = pos;
     _setRobotPos(pos);
@@ -264,7 +275,7 @@ export function LiveMap({ startLat, startLng, dropLat, dropLng, currentLat, curr
                   strokeColor: '#6366f1',
                   scale: 3,
                 },
-                offset: '0',
+                offset: `${100 - lineOffset}%`, // Animate backwards so it looks like it's moving forward
                 repeat: '14px',
               },
             ],

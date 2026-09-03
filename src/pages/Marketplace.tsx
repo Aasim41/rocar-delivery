@@ -12,6 +12,18 @@ import { ThemeToggle } from '../components/ThemeToggle';
 
 const MAX_PAYLOAD_GRAMS = 2000;
 
+function getDistanceInKm(lat1: number, lon1: number, lat2: number, lon2: number) {
+  const R = 6371; // Radius of the earth in km
+  const dLat = (lat2 - lat1) * (Math.PI / 180);
+  const dLon = (lon2 - lon1) * (Math.PI / 180);
+  const a = 
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) * 
+    Math.sin(dLon/2) * Math.sin(dLon/2); 
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
+  return R * c; 
+}
+
 function CatalogItem({ item, cart, updateCart, shops }: any) {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: "-50px" });
@@ -65,6 +77,8 @@ export function Marketplace() {
   const [catalog, setCatalog] = useState<any[]>([]);
   const [shops, setShops] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingText, setLoadingText] = useState('Finding your location...');
+  const [locationError, setLocationError] = useState<string | null>(null);
   const [cart, setCart] = useState<Record<string, number>>({});
   const [showCheckoutForm, setShowCheckoutForm] = useState(false);
   const [deliveryAddress, setDeliveryAddress] = useState<SavedLocation | null>(null);
@@ -78,19 +92,51 @@ export function Marketplace() {
   }, []);
 
   const fetchData = async () => {
-    const { data: shopsData } = await supabase.from('shops').select('*');
-    if (shopsData) setShops(shopsData);
+    setLoading(true);
+    setLoadingText('Acquiring GPS location...');
 
-    const { data: itemsData } = await supabase.from('items').select('*').order('name');
-    if (itemsData) setCatalog(itemsData);
-
-    // check if there's an active cart shop
-    const storedCartShop = sessionStorage.getItem('activeCartShopId');
-    if (!storedCartShop) {
-      setCart({});
+    if (!navigator.geolocation) {
+      setLocationError('Geolocation is not supported by your browser.');
+      setLoading(false);
+      return;
     }
 
-    setLoading(false);
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const userLat = position.coords.latitude;
+        const userLng = position.coords.longitude;
+        
+        setLoadingText('Loading nearby shops...');
+        const { data: shopsData } = await supabase.from('shops').select('*');
+        let nearbyShops = [];
+        if (shopsData) {
+          nearbyShops = shopsData.filter((shop) => {
+             const dist = getDistanceInKm(userLat, userLng, shop.lat, shop.lng);
+             return dist <= 5000; // Increased to 5000km for testing purposes
+          });
+          setShops(nearbyShops);
+        }
+
+        const { data: itemsData } = await supabase.from('items').select('*').order('name');
+        if (itemsData) {
+          const shopIds = new Set(nearbyShops.map(s => s.id));
+          const availableItems = itemsData.filter(item => shopIds.has(item.shop_id));
+          setCatalog(availableItems);
+        }
+
+        const storedCartShop = sessionStorage.getItem('activeCartShopId');
+        if (!storedCartShop) {
+          setCart({});
+        }
+
+        setLoading(false);
+      },
+      () => {
+        setLocationError('Unable to retrieve your location. Please allow GPS access in your browser/device settings.');
+        setLoading(false);
+      },
+      { timeout: 15000, enableHighAccuracy: true }
+    );
   };
 
   const updateCart = (item: any, delta: number) => {
@@ -141,62 +187,87 @@ export function Marketplace() {
       if (isOverweight) { toast.error("Cart is over weight limit"); return; }
       if (!deliveryAddress) { toast.error("Please select a delivery address"); return; }
       
-      const { data: { session } } = await supabase.auth.getSession();
-      let orderId = Math.random().toString(36).substring(7);
-      
       const storedCartShop = sessionStorage.getItem('activeCartShopId');
       const shop = shops.find(s => s.id === storedCartShop);
       if (!shop) {
          toast.error("Shop data missing!");
          return;
       }
+
+      // Load Razorpay Script dynamically
+      const script = document.createElement('script');
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      script.async = true;
+      document.body.appendChild(script);
+
+      script.onload = async () => {
+        try {
+          // 1. Create order on Python backend
+          const orderRes = await fetch("http://localhost:8000/api/create_order", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ amount_inr: cartTotalPrice })
+          });
+          const orderData = await orderRes.json();
+          
+          if (!orderRes.ok) throw new Error(orderData.error || "Failed to create order");
+
+          // 2. Setup Razorpay options
+          const options = {
+            key: "rzp_test_TXX8gDzQSotwG0", 
+            amount: orderData.amount, // Amount in paise from backend
+            currency: "INR",
+            name: "RoCAR Delivery",
+            description: "Order Payment",
+            order_id: orderData.order_id, // Pass the backend order ID
+            image: "https://your-logo-url.com/logo.png",
+            handler: async function (response: any) {
+              try {
+                // 3. Verify signature on Python backend
+                const verifyRes = await fetch("http://localhost:8000/api/verify_payment", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    razorpay_order_id: response.razorpay_order_id,
+                    razorpay_payment_id: response.razorpay_payment_id,
+                    razorpay_signature: response.razorpay_signature
+                  })
+                });
+                
+                const verifyData = await verifyRes.json();
+                if (!verifyRes.ok) throw new Error(verifyData.error || "Verification failed");
+                
+                console.log("Payment verified securely!");
+                toast.success("Payment successful!");
+                await createOrderAndNavigate(shop);
+              } catch (verifyErr: any) {
+                toast.error("Payment verification failed: " + verifyErr.message);
+              }
+            },
+            prefill: {
+              name: "RoCAR Customer",
+              email: "customer@rocar.delivery",
+              contact: "9999999999"
+            },
+            theme: {
+              color: "#0ea5e9"
+            }
+          };
+
+          const rzp = new (window as any).Razorpay(options);
+          rzp.on('payment.failed', function (response: any) {
+            toast.error("Payment failed: " + response.error.description);
+          });
+          rzp.open();
+        } catch (backendErr: any) {
+          toast.error("Error setting up payment: " + backendErr.message);
+        }
+      };
       
-      console.log("Creating order data");
-      const orderData = {
-        user_id: (session && session.user.id !== 'demo-user-123') ? session.user.id : null,
-        shop_id: shop.id,
-        status: 'at_pickup',
-        total_weight_grams: cartTotalWeight,
-        items: Object.entries(cart).map(([id, qty]) => {
-          const item = catalog.find(i => i.id === id);
-          return { id, name: item?.name, qty, price: item?.price };
-        })
+      script.onerror = () => {
+        toast.error("Failed to load Razorpay checkout.");
       };
 
-      console.log("Inserting order...");
-      const { data, error } = await supabase.from('orders').insert([orderData]).select().single();
-      if (data && !error) {
-        orderId = data.id;
-        console.log("Order created:", orderId);
-      } else {
-        toast.error("Order failed: " + (error?.message || "Unknown error"));
-        return;
-      }
-      
-      const dropLat = deliveryAddress.lat ?? 24.6380;
-      const dropLng = deliveryAddress.lng ?? 77.3110;
-      const startLat = shop.lat; 
-      const startLng = shop.lng;
-
-      try {
-          const backendUrl = localStorage.getItem('BACKEND_URL') || 'http://localhost:8000';
-          console.log("Fetching backend...");
-          fetch(`${backendUrl}/backend/coordinates/destinations`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                  kart: { latitude: startLat, longitude: startLng, heading: 0 },
-                  marketplace: { latitude: startLat, longitude: startLng },
-                  delivery_point: { latitude: dropLat, longitude: dropLng }
-              })
-          }).catch(err => console.error("Failed to update Python Backend Route", err));
-      } catch (err) {
-          console.error("Failed to initiate fetch", err);
-      }
-
-      sessionStorage.removeItem('activeCartShopId');
-      console.log("Navigating to tracking...");
-      navigate(`/tracking/${orderId}?type=marketplace&startLat=${startLat}&startLng=${startLng}&dropLat=${dropLat}&dropLng=${dropLng}`);
     } catch (err: any) {
       console.error("CRITICAL ERROR IN CHECKOUT:", err);
       alert("Checkout crashed: " + err.message);
@@ -208,8 +279,43 @@ export function Marketplace() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[var(--bg-page)] flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-[var(--color-sky)] animate-spin" />
+      <div className="min-h-screen bg-[var(--bg-page)] flex flex-col items-center justify-center p-6 text-center">
+        <Loader2 className="w-10 h-10 text-[var(--color-sky)] animate-spin mb-4" />
+        <h2 className="text-xl font-bold text-[var(--text-main)]">{loadingText}</h2>
+        <p className="text-[var(--text-muted)] mt-2">Please allow GPS access if prompted.</p>
+      </div>
+    );
+  }
+
+  if (locationError) {
+    return (
+      <div className="min-h-screen bg-[var(--bg-page)] flex flex-col items-center justify-center p-6 text-center">
+        <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mb-4">
+          <AlertCircle className="w-8 h-8 text-red-500" />
+        </div>
+        <h2 className="text-2xl font-bold text-[var(--text-main)] mb-2">Location Required</h2>
+        <p className="text-[var(--text-muted)] max-w-md">{locationError}</p>
+        <button 
+          onClick={() => window.location.reload()}
+          className="mt-6 bg-[var(--color-sky)] text-white px-6 py-2.5 rounded-xl font-bold hover:bg-opacity-90 transition-all"
+        >
+          Try Again
+        </button>
+      </div>
+    );
+  }
+
+  if (shops.length === 0) {
+    return (
+      <div className="min-h-screen bg-[var(--bg-page)] flex flex-col items-center justify-center p-6 text-center">
+        <div className="w-20 h-20 bg-[var(--bg-page)]/50 border border-[var(--border-color)] rounded-2xl flex items-center justify-center mb-4">
+          <MapPin className="w-10 h-10 text-[var(--text-muted)]" />
+        </div>
+        <h2 className="text-2xl font-bold text-[var(--text-main)] mb-2">No Shops Nearby</h2>
+        <p className="text-[var(--text-muted)] max-w-md">
+          There are currently no RoCAR delivery partner shops within 3km of your location. 
+          Please try again later or from a different location.
+        </p>
       </div>
     );
   }
@@ -327,14 +433,21 @@ export function Marketplace() {
         />
 
         <div className="fixed bottom-28 left-0 right-0 px-6 z-40 pointer-events-none">
-          <div className="max-w-xs mx-auto pointer-events-auto">
+          <div className="max-w-xs mx-auto pointer-events-auto flex flex-col space-y-3">
             <button 
               onClick={handleCheckoutSubmit}
               type="button"
-              className="w-full primary-button text-white text-base py-3.5 flex justify-between items-center px-5"
+              className="w-full primary-button text-white text-base py-3.5 flex justify-between items-center px-5 shadow-lg"
             >
-              <span className="font-bold">Place Order</span>
+              <span className="font-bold">Pay & Place Order</span>
               <span className="font-bold bg-white/20 px-3 py-1 rounded-xl text-sm">₹{cartTotalPrice.toFixed(2)}</span>
+            </button>
+            <button 
+              onClick={handleBypassPayment}
+              type="button"
+              className="w-full bg-[var(--bg-page)] text-[var(--text-muted)] border border-[var(--border-color)] text-sm py-2.5 rounded-xl font-bold hover:bg-[var(--border-color)] transition-all"
+            >
+              Bypass Payment (Test)
             </button>
           </div>
         </div>
