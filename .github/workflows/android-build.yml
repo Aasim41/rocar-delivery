@@ -38,7 +38,17 @@ jobs:
 
       - name: Build Android APK
         working-directory: ./android
-        run: chmod +x ./gradlew && ./gradlew assembleDebug
+        run: |
+          chmod +x ./gradlew
+          for attempt in 1 2 3; do
+            ./gradlew assembleDebug && exit 0
+            if [ "$attempt" -lt 3 ]; then
+              echo "Gradle build failed (attempt $attempt). Retrying in 30 seconds..."
+              sleep 30
+            fi
+          done
+          echo "Gradle build failed after 3 attempts."
+          exit 1
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
