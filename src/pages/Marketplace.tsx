@@ -179,6 +179,68 @@ export function Marketplace() {
   const itemCount = Object.values(cart).reduce((a, b) => a + b, 0);
   const weightPercentage = Math.min(100, (cartTotalWeight / MAX_PAYLOAD_GRAMS) * 100);
 
+  const createOrderAndNavigate = async (shop: any) => {
+    const { data: { session } } = await supabase.auth.getSession();
+    let orderId = Math.random().toString(36).substring(7);
+
+    const orderData = {
+      user_id: (session && session.user.id !== 'demo-user-123') ? session.user.id : null,
+      shop_id: shop.id,
+      status: 'at_pickup',
+      total_weight_grams: cartTotalWeight,
+      items: Object.entries(cart).map(([id, qty]) => {
+        const item = catalog.find(i => i.id === id);
+        return { id, name: item?.name, qty, price: item?.price };
+      })
+    };
+
+    const { data, error } = await supabase.from('orders').insert([orderData]).select().single();
+    if (data && !error) {
+      orderId = data.id;
+    } else {
+      toast.error("Order failed: " + (error?.message || "Unknown error"));
+      return;
+    }
+
+    const dropLat = deliveryAddress?.lat ?? 24.6380;
+    const dropLng = deliveryAddress?.lng ?? 77.3110;
+    const startLat = shop.lat;
+    const startLng = shop.lng;
+
+    try {
+      const backendUrl = localStorage.getItem('BACKEND_URL') || 'http://localhost:8000';
+      fetch(`${backendUrl}/backend/coordinates/destinations`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          kart: { latitude: startLat, longitude: startLng, heading: 0 },
+          marketplace: { latitude: startLat, longitude: startLng },
+          delivery_point: { latitude: dropLat, longitude: dropLng }
+        })
+      }).catch(err => console.error("Failed to update Python Backend Route", err));
+    } catch (err) {
+      console.error("Failed to initiate fetch", err);
+    }
+
+    sessionStorage.removeItem('activeCartShopId');
+    navigate(`/tracking/${orderId}?type=marketplace&startLat=${startLat}&startLng=${startLng}&dropLat=${dropLat}&dropLng=${dropLng}`);
+  };
+
+  const handleBypassPayment = async () => {
+    if (itemCount === 0) { toast.error("Cart is empty"); return; }
+    if (isOverweight) { toast.error("Cart is over weight limit"); return; }
+    if (!deliveryAddress) { toast.error("Please select a delivery address"); return; }
+
+    const storedCartShop = sessionStorage.getItem('activeCartShopId');
+    const shop = shops.find(s => s.id === storedCartShop);
+    if (!shop) {
+      toast.error("Shop data missing!");
+      return;
+    }
+
+    await createOrderAndNavigate(shop);
+  };
+
   const handleCheckoutSubmit = async (e?: React.FormEvent | React.MouseEvent) => {
     try {
       if (e) e.preventDefault();
