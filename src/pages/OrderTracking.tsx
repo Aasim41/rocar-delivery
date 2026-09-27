@@ -135,8 +135,8 @@ export function OrderTracking() {
           if (backendStatusIdx > currentStatus && backendStatusIdx <= 2) {
             setCurrentStatus(backendStatusIdx);
           }
-          // If backend says IDLE and we're in DELIVERY phase, bot has arrived
-          if (data.active_phase === 'IDLE' && currentStatus >= 2) {
+          // If backend says IDLE/RETURNING and we're in DELIVERY phase, bot has arrived
+          if ((data.active_phase === 'IDLE' || data.active_phase === 'RETURNING') && currentStatus >= 2) {
             setCurrentStatus(3);
           }
         }

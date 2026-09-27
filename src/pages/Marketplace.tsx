@@ -202,8 +202,8 @@ export function Marketplace() {
 
       script.onload = async () => {
         try {
-          // 1. Create order on Python backend
-          const orderRes = await fetch("http://localhost:8000/api/create_order", {
+          const backendUrl = localStorage.getItem('BACKEND_URL') || 'http://localhost:8000';
+          const orderRes = await fetch(`${backendUrl}/api/create_order`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ amount_inr: cartTotalPrice })
@@ -224,7 +224,7 @@ export function Marketplace() {
             handler: async function (response: any) {
               try {
                 // 3. Verify signature on Python backend
-                const verifyRes = await fetch("http://localhost:8000/api/verify_payment", {
+                const verifyRes = await fetch(`${backendUrl}/api/verify_payment`, {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({
