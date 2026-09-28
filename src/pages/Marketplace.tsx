@@ -93,50 +93,62 @@ export function Marketplace() {
 
   const fetchData = async () => {
     setLoading(true);
-    setLoadingText('Acquiring GPS location...');
+    
+    const cachedLat = sessionStorage.getItem('userLat');
+    const cachedLng = sessionStorage.getItem('userLng');
+    
+    if (cachedLat && cachedLng) {
+      await loadShopsAndItems(parseFloat(cachedLat), parseFloat(cachedLng));
+    } else {
+      setLoadingText('Acquiring GPS location...');
+      if (!navigator.geolocation) {
+        setLocationError('Geolocation is not supported by your browser.');
+        setLoading(false);
+        return;
+      }
 
-    if (!navigator.geolocation) {
-      setLocationError('Geolocation is not supported by your browser.');
-      setLoading(false);
-      return;
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          const userLat = position.coords.latitude;
+          const userLng = position.coords.longitude;
+          sessionStorage.setItem('userLat', userLat.toString());
+          sessionStorage.setItem('userLng', userLng.toString());
+          await loadShopsAndItems(userLat, userLng);
+        },
+        () => {
+          setLocationError('Unable to retrieve your location. Please allow GPS access in your browser/device settings.');
+          setLoading(false);
+        },
+        { timeout: 15000, enableHighAccuracy: true, maximumAge: 60000 }
+      );
+    }
+  };
+
+  const loadShopsAndItems = async (userLat: number, userLng: number) => {
+    setLoadingText('Loading nearby shops...');
+    const { data: shopsData } = await supabase.from('shops').select('*');
+    let nearbyShops = [];
+    if (shopsData) {
+      nearbyShops = shopsData.filter((shop) => {
+         const dist = getDistanceInKm(userLat, userLng, shop.lat, shop.lng);
+         return dist <= 5000; // Increased to 5000km for testing purposes
+      });
+      setShops(nearbyShops);
     }
 
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const userLat = position.coords.latitude;
-        const userLng = position.coords.longitude;
-        
-        setLoadingText('Loading nearby shops...');
-        const { data: shopsData } = await supabase.from('shops').select('*');
-        let nearbyShops = [];
-        if (shopsData) {
-          nearbyShops = shopsData.filter((shop) => {
-             const dist = getDistanceInKm(userLat, userLng, shop.lat, shop.lng);
-             return dist <= 5000; // Increased to 5000km for testing purposes
-          });
-          setShops(nearbyShops);
-        }
+    const { data: itemsData } = await supabase.from('items').select('*').order('name');
+    if (itemsData) {
+      const shopIds = new Set(nearbyShops.map(s => s.id));
+      const availableItems = itemsData.filter(item => shopIds.has(item.shop_id));
+      setCatalog(availableItems);
+    }
 
-        const { data: itemsData } = await supabase.from('items').select('*').order('name');
-        if (itemsData) {
-          const shopIds = new Set(nearbyShops.map(s => s.id));
-          const availableItems = itemsData.filter(item => shopIds.has(item.shop_id));
-          setCatalog(availableItems);
-        }
+    const storedCartShop = sessionStorage.getItem('activeCartShopId');
+    if (!storedCartShop) {
+      setCart({});
+    }
 
-        const storedCartShop = sessionStorage.getItem('activeCartShopId');
-        if (!storedCartShop) {
-          setCart({});
-        }
-
-        setLoading(false);
-      },
-      () => {
-        setLocationError('Unable to retrieve your location. Please allow GPS access in your browser/device settings.');
-        setLoading(false);
-      },
-      { timeout: 15000, enableHighAccuracy: true }
-    );
+    setLoading(false);
   };
 
   const updateCart = (item: any, delta: number) => {

@@ -19,8 +19,7 @@ export function Profile() {
   const [editingAddressIdx, setEditingAddressIdx] = useState<number | null>(null);
   const [editAddressName, setEditAddressName] = useState('');
 
-  // Developer settings
-  const [backendUrl, setBackendUrl] = useState(localStorage.getItem('BACKEND_URL') || 'http://localhost:8000');
+
 
   const navigate = useNavigate();
 
@@ -99,10 +98,7 @@ export function Profile() {
     }
   };
 
-  const saveBackendUrl = () => {
-    localStorage.setItem('BACKEND_URL', backendUrl);
-    // Visual feedback could be added here, but saving is immediate
-  };
+
 
   if (loading) {
     return (
@@ -299,32 +295,7 @@ export function Profile() {
         </div>
       </div>
 
-      {/* Developer Settings */}
-      <div className="glass-card p-6 mb-8 relative z-10">
-        <div className="flex items-center space-x-2 mb-4">
-          <Settings className="w-5 h-5 text-slate-500" />
-          <h2 className="font-bold text-[var(--text-main)] text-lg">Developer Settings</h2>
-        </div>
-        <div className="space-y-2">
-          <label className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">Backend API URL</label>
-          <div className="flex space-x-2">
-            <input 
-              type="text" 
-              value={backendUrl}
-              onChange={(e) => setBackendUrl(e.target.value)}
-              className="flex-1 bg-[var(--bg-page)] border border-[var(--border-color)] px-3 py-2 rounded-lg text-sm text-[var(--text-main)] focus:outline-none focus:border-[var(--color-sky)]"
-              placeholder="http://localhost:8000"
-            />
-            <button 
-              onClick={saveBackendUrl}
-              className="px-4 py-2 bg-[var(--color-sky)] text-white font-bold rounded-lg text-sm hover:opacity-90 transition-opacity"
-            >
-              Save
-            </button>
-          </div>
-          <p className="text-xs text-[var(--text-muted)]">Use your LocalTunnel URL if accessing from a phone (e.g. https://my-bot.loca.lt).</p>
-        </div>
-      </div>
+
       </div>
 
       {/* Logout */}
