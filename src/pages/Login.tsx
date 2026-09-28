@@ -4,6 +4,7 @@ import { User, Store, Loader2, ShieldCheck } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 import { Capacitor } from '@capacitor/core';
+import { Browser } from '@capacitor/browser';
 
 export function Login() {
   const [email, setEmail] = useState('');
@@ -17,19 +18,25 @@ export function Login() {
   const handleGoogleLogin = async () => {
     setLoading(true);
     
-    // If running in Android APK, redirect to the custom app scheme. 
-    // If running on the web, use the standard window URL.
-    const redirectUrl = Capacitor.isNativePlatform() ? 'rocar://login' : window.location.origin;
+    const isNative = Capacitor.isNativePlatform();
+    const redirectUrl = isNative ? 'rocar://login' : window.location.origin;
     
-    const { error } = await supabase.auth.signInWithOAuth({
+    const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
         redirectTo: redirectUrl,
+        skipBrowserRedirect: isNative, // Don't redirect the main Webview away if we are in the APK
       }
     });
+    
     if (error) {
       setError(error.message);
       setLoading(false);
+      return;
+    }
+
+    if (isNative && data?.url) {
+      await Browser.open({ url: data.url });
     }
   };
 

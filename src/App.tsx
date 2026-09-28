@@ -59,8 +59,13 @@ function AppRoutes() {
 
     // Handle Deep Link for Google OAuth in Native APK
     import('@capacitor/app').then(({ App: CapacitorApp }) => {
-      CapacitorApp.addListener('appUrlOpen', (event) => {
+      CapacitorApp.addListener('appUrlOpen', async (event) => {
         if (event.url.includes('#access_token=')) {
+          // Close the Capacitor Browser overlay that we opened for OAuth
+          import('@capacitor/browser').then(({ Browser }) => {
+            Browser.close().catch(() => {});
+          });
+          
           const url = new URL(event.url);
           const hashParams = new URLSearchParams(url.hash.substring(1));
           const accessToken = hashParams.get('access_token');
