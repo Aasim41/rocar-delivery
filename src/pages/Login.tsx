@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { User, Store, Loader2, ShieldCheck } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
+import { Capacitor } from '@capacitor/core';
+
 export function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -14,10 +16,15 @@ export function Login() {
 
   const handleGoogleLogin = async () => {
     setLoading(true);
+    
+    // If running in Android APK, redirect to the custom app scheme. 
+    // If running on the web, use the standard window URL.
+    const redirectUrl = Capacitor.isNativePlatform() ? 'rocar://login' : window.location.origin;
+    
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: window.location.origin,
+        redirectTo: redirectUrl,
       }
     });
     if (error) {

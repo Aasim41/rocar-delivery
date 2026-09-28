@@ -57,6 +57,24 @@ function AppRoutes() {
       }
     });
 
+    // Handle Deep Link for Google OAuth in Native APK
+    import('@capacitor/app').then(({ App: CapacitorApp }) => {
+      CapacitorApp.addListener('appUrlOpen', (event) => {
+        if (event.url.includes('#access_token=')) {
+          const url = new URL(event.url);
+          const hashParams = new URLSearchParams(url.hash.substring(1));
+          const accessToken = hashParams.get('access_token');
+          const refreshToken = hashParams.get('refresh_token');
+          if (accessToken && refreshToken) {
+            supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken
+            });
+          }
+        }
+      });
+    }).catch(() => {});
+
     return () => subscription.unsubscribe();
   }, []);
 
