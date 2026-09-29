@@ -1,30 +1,24 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Package, ShoppingBag, Map, User, Moon, Sun } from 'lucide-react';
+import { Package, Send, MapPin, User } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { WaveInput } from '../components/WaveInput';
 
 const slides = [
   {
     icon: Package,
-    title: 'Get your parcel delivered without leaving your room',
-    description: 'Autonomous delivery straight to your doorstep.',
-    color: 'text-[var(--color-sky)]',
-    bg: 'bg-[var(--color-sky)]/10 border border-[var(--color-sky)]/20',
+    title: 'Send packages across campus without walking',
+    description: 'Our autonomous carts pick up and deliver anything, anywhere on campus.',
   },
   {
-    icon: ShoppingBag,
-    title: 'Order medicines & essentials from local shops',
-    description: 'Shop from the campus marketplace with zero delivery fees.',
-    color: 'text-[var(--color-green)]',
-    bg: 'bg-[var(--color-green)]/10 border border-[var(--color-green)]/20',
+    icon: Send,
+    title: 'Send or Fetch — your choice',
+    description: 'Dispatch a package to someone, or request an empty cart to collect an item for you.',
   },
   {
-    icon: Map,
-    title: 'Track your delivery live on the map',
-    description: 'Know exactly when your delivery will arrive with real-time ETA.',
-    color: 'text-[var(--color-purple)]',
-    bg: 'bg-[var(--color-purple)]/10 border border-[var(--color-purple)]/20',
+    icon: MapPin,
+    title: 'Track your delivery live',
+    description: 'Watch the cart navigate in real-time on the map. Get notified when it arrives.',
   },
 ];
 
@@ -33,25 +27,8 @@ export function Onboarding({ onComplete }: { onComplete?: () => void }) {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [direction, setDirection] = useState(1);
   
-  // Profile collection state
   const [name, setName] = useState('');
   const [age, setAge] = useState('');
-  const [isDarkMode, setIsDarkMode] = useState(
-    () => document.documentElement.classList.contains('dark')
-  );
-
-  const toggleTheme = () => {
-    const html = document.documentElement;
-    if (html.classList.contains('dark')) {
-      html.classList.remove('dark');
-      setIsDarkMode(false);
-      localStorage.setItem('theme', 'light');
-    } else {
-      html.classList.add('dark');
-      setIsDarkMode(true);
-      localStorage.setItem('theme', 'dark');
-    }
-  };
 
   const handleNext = () => {
     setDirection(1);
@@ -90,20 +67,11 @@ export function Onboarding({ onComplete }: { onComplete?: () => void }) {
   const isFinalSlide = currentSlide === slides.length;
 
   return (
-    <div className="flex flex-col h-[100dvh] bg-[var(--bg-page)] font-sans relative overflow-hidden">
-      {/* Premium Animated Background Elements */}
-      <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-[var(--color-sky)] rounded-full opacity-10 blur-[100px] pointer-events-none z-0" />
-      <div className="absolute bottom-[20%] right-[-10%] w-80 h-80 bg-[var(--color-green)] rounded-full opacity-10 blur-[100px] pointer-events-none z-0" />
+    <div className="flex flex-col h-[100dvh] bg-zinc-950 font-sans relative overflow-hidden">
+      {/* Subtle ambient glow */}
+      <div className="absolute top-[-15%] left-[-15%] w-96 h-96 bg-zinc-700 rounded-full opacity-10 blur-[120px] pointer-events-none z-0" />
 
-      {/* Floating Dark Mode Toggle */}
-      <button 
-        onClick={toggleTheme}
-        className="absolute top-6 right-6 z-50 w-12 h-12 glass-panel flex items-center justify-center rounded-full text-[var(--text-main)] hover:scale-105 transition-transform shadow-lg"
-      >
-        {isDarkMode ? <Sun className="w-5 h-5 font-semibold text-[var(--color-yellow)]" /> : <Moon className="w-5 h-5 font-semibold text-[var(--color-sky)]" />}
-      </button>
-
-      <div className="flex-1 flex flex-col justify-start sm:justify-center p-6 pt-16 relative z-10 w-full max-w-md mx-auto overflow-y-auto overflow-x-hidden">
+      <div className="flex-1 flex flex-col justify-start sm:justify-center p-6 pt-20 relative z-10 w-full max-w-md mx-auto overflow-y-auto overflow-x-hidden">
         <AnimatePresence mode="wait" custom={direction}>
           {!isFinalSlide ? (
             <motion.div
@@ -116,14 +84,14 @@ export function Onboarding({ onComplete }: { onComplete?: () => void }) {
               transition={{ x: { type: "spring", stiffness: 300, damping: 30 }, opacity: { duration: 0.2 } }}
               className="w-full text-center flex flex-col items-center"
             >
-              <div className={`w-32 h-32 rounded-[2.5rem] flex items-center justify-center mb-8 shadow-sm ${slides[currentSlide].bg}`}>
+              <div className="w-28 h-28 rounded-3xl flex items-center justify-center mb-8 bg-zinc-900 border border-zinc-800">
                 {(() => {
                   const SlideIcon = slides[currentSlide].icon;
-                  return <SlideIcon className={`w-16 h-16 ${slides[currentSlide].color}`} />;
+                  return <SlideIcon className="w-14 h-14 text-white" />;
                 })()}
               </div>
-              <h1 className="text-2xl font-bold text-[var(--text-main)] mb-4 tracking-tight px-4">{slides[currentSlide].title}</h1>
-              <p className="text-[var(--text-muted)] font-medium px-4">{slides[currentSlide].description}</p>
+              <h1 className="text-2xl font-bold text-white mb-4 tracking-tight px-4">{slides[currentSlide].title}</h1>
+              <p className="text-zinc-500 font-medium px-4 text-[15px]">{slides[currentSlide].description}</p>
             </motion.div>
           ) : (
             <motion.form
@@ -138,11 +106,11 @@ export function Onboarding({ onComplete }: { onComplete?: () => void }) {
               className="w-full"
             >
               <div className="text-center mb-8">
-                <div className="w-24 h-24 mx-auto bg-[var(--color-sky)]/10 border border-[var(--color-sky)]/20 rounded-full flex items-center justify-center mb-6">
-                  <User className="w-12 h-12 text-[var(--color-sky)]" />
+                <div className="w-20 h-20 mx-auto bg-zinc-900 border border-zinc-800 rounded-full flex items-center justify-center mb-6">
+                  <User className="w-10 h-10 text-white" />
                 </div>
-                <h1 className="text-2xl font-bold text-[var(--text-main)] mb-2 tracking-tight">Let's get to know you</h1>
-                <p className="text-[var(--text-muted)] font-medium">Just a few details before we begin.</p>
+                <h1 className="text-2xl font-bold text-white mb-2 tracking-tight">Let's get to know you</h1>
+                <p className="text-zinc-500 font-medium">Just a few details before we begin.</p>
               </div>
 
               <div className="space-y-4 px-4 pb-4">
@@ -163,8 +131,7 @@ export function Onboarding({ onComplete }: { onComplete?: () => void }) {
                     onChange={(e) => setAge(e.target.value)}
                   />
                 </div>
-
-                </div>
+              </div>
             </motion.form>
           )}
         </AnimatePresence>
@@ -176,13 +143,13 @@ export function Onboarding({ onComplete }: { onComplete?: () => void }) {
             {slides.map((_, index) => (
               <div
                 key={index}
-                className={`w-2 h-2 rounded-full transition-colors duration-300 ${
-                  index === currentSlide ? 'bg-[var(--color-sky)] w-6' : 'bg-[var(--text-muted)]/30'
+                className={`h-1.5 rounded-full transition-all duration-300 ${
+                  index === currentSlide ? 'bg-white w-8' : 'bg-zinc-800 w-2'
                 }`}
               />
             ))}
-            <div className={`w-2 h-2 rounded-full transition-colors duration-300 ${
-                currentSlide === slides.length ? 'bg-[var(--color-sky)] w-6' : 'bg-[var(--text-muted)]/30'
+            <div className={`h-1.5 rounded-full transition-all duration-300 ${
+                currentSlide === slides.length ? 'bg-white w-8' : 'bg-zinc-800 w-2'
               }`} 
             />
           </div>
@@ -192,7 +159,7 @@ export function Onboarding({ onComplete }: { onComplete?: () => void }) {
           {!isFinalSlide ? (
             <button
               onClick={handleNext}
-              className="w-full minimal-button bg-[var(--color-sky)] text-white font-semibold py-4 rounded-xl shadow-lg hover:opacity-90 transition-opacity text-lg"
+              className="w-full bg-white text-zinc-900 font-semibold py-4 rounded-xl hover:bg-zinc-200 transition-colors text-[15px]"
             >
               Continue
             </button>
@@ -200,7 +167,7 @@ export function Onboarding({ onComplete }: { onComplete?: () => void }) {
             <button
               onClick={() => handleFinish()}
               disabled={!name || !age}
-              className="w-full minimal-button bg-[var(--color-sky)] text-white font-semibold py-4 rounded-xl shadow-lg hover:opacity-90 transition-opacity text-lg disabled:opacity-50"
+              className="w-full bg-white text-zinc-900 font-semibold py-4 rounded-xl hover:bg-zinc-200 transition-colors text-[15px] disabled:opacity-30 disabled:cursor-not-allowed"
             >
               Get Started
             </button>
@@ -208,9 +175,9 @@ export function Onboarding({ onComplete }: { onComplete?: () => void }) {
           {!isFinalSlide && (
             <button
               onClick={() => { setDirection(1); setCurrentSlide(slides.length); }}
-              className="w-full text-[var(--text-muted)] font-medium py-3 hover:text-[var(--text-main)] transition-colors"
+              className="w-full text-zinc-600 font-medium py-3 hover:text-zinc-400 transition-colors text-sm"
             >
-              Skip to Profile
+              Skip
             </button>
           )}
         </div>

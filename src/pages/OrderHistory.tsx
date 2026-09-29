@@ -1,187 +1,185 @@
-import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Package, Clock, ArrowLeft, Loader2, Star, X } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { toast } from 'react-hot-toast';
+import { motion } from 'framer-motion';
+import { Package, MapPin, Calendar, Send, ArrowDownToLine, ChevronLeft } from 'lucide-react';
+import { supabase } from '../lib/supabase';
+
+interface Delivery {
+  id: string;
+  created_at: string;
+  sender_id: string;
+  receiver_id: string;
+  package_details: string;
+  status: string;
+  pickup_lat: number;
+  pickup_lng: number;
+  dropoff_lat: number;
+  dropoff_lng: number;
+}
+
+function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+function timeAgo(dateString: string) {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+  if (diffInSeconds < 60) return 'Just now';
+  const diffInMinutes = Math.floor(diffInSeconds / 60);
+  if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
+  const diffInHours = Math.floor(diffInMinutes / 60);
+  if (diffInHours < 24) return `${diffInHours}h ago`;
+  const diffInDays = Math.floor(diffInHours / 24);
+  if (diffInDays === 1) return 'Yesterday';
+  if (diffInDays < 7) return `${diffInDays}d ago`;
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
 
 export function OrderHistory() {
-  const [orders, setOrders] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [ratingModal, setRatingModal] = useState<{ isOpen: boolean; orderId: string | null }>({ isOpen: false, orderId: null });
-  const [ratingValue, setRatingValue] = useState(5);
-  const [reviewText, setReviewText] = useState('');
-  
   const navigate = useNavigate();
+  const [deliveries, setDeliveries] = useState<Delivery[]>([]);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchData();
+    async function loadData() {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) { setLoading(false); return; }
+        setUserId(user.id);
+        const { data } = await supabase
+          .from('deliveries')
+          .select('*')
+          .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
+          .order('created_at', { ascending: false });
+        setDeliveries(data || []);
+      } catch (err) {
+        console.error('Failed to load deliveries', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
   }, []);
 
-  const fetchData = async () => {
-    setLoading(true);
-    const { data: { session } } = await supabase.auth.getSession();
-
-    if (session) {
-      if (session.user.id === 'demo-user-123') {
-        setOrders([]);
-        setLoading(false);
-        return;
-      }
-
-      const { data } = await supabase.from('orders').select('*').eq('user_id', session.user.id).order('created_at', { ascending: false });
-      
-      if (data) setOrders(data);
+  const completedDeliveries = deliveries.filter(d => d.status === 'completed');
+  const totalDeliveries = completedDeliveries.length;
+  
+  const distanceSaved = completedDeliveries.reduce((sum, d) => {
+    if (d.pickup_lat && d.pickup_lng && d.dropoff_lat && d.dropoff_lng) {
+      return sum + haversineKm(d.pickup_lat, d.pickup_lng, d.dropoff_lat, d.dropoff_lng);
     }
-    setLoading(false);
-  };
+    return sum;
+  }, 0);
 
-  const handleSubmitReview = () => {
-    toast.success(`Review submitted! You rated ${ratingValue} stars.`);
-    setRatingModal({ isOpen: false, orderId: null });
-    setReviewText('');
-    setRatingValue(5);
-  };
+  const thisMonthCount = completedDeliveries.filter(d => {
+    const dDate = new Date(d.created_at);
+    const now = new Date();
+    return dDate.getMonth() === now.getMonth() && dDate.getFullYear() === now.getFullYear();
+  }).length;
+
+  const stagger = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.05 } } };
+  const fadeUp = { hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[var(--bg-page)] flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-[var(--color-sky)] animate-spin" />
+      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-zinc-400 border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
   return (
-    <motion.div 
-      initial={{ opacity: 0, x: 20 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: -20 }}
-      className="p-6 max-w-md mx-auto pb-32 font-sans min-h-screen relative overflow-hidden bg-[var(--bg-page)]"
-    >
-      <div className="absolute top-[-10%] right-[-10%] w-64 h-64 bg-[var(--color-sky)] rounded-full opacity-10 blur-[80px] pointer-events-none z-0" />
-
-      <header className="mb-8 mt-6 relative z-10 flex items-center">
-        <button 
-          onClick={() => navigate(-1)} 
-          className="p-2 mr-3 bg-[var(--bg-page)]/50 border border-[var(--border-color)] rounded-full text-[var(--text-main)] hover:bg-[var(--border-color)] transition-colors"
-        >
-          <ArrowLeft className="w-5 h-5" />
-        </button>
-        <h1 className="text-3xl font-extrabold text-[var(--text-main)] tracking-tight">Order History</h1>
+    <div className="min-h-screen bg-zinc-950 text-zinc-200 pb-20">
+      {/* Header */}
+      <header className="sticky top-0 z-10 bg-zinc-950/80 backdrop-blur-xl border-b border-zinc-800/50">
+        <div className="flex items-center px-5 py-4">
+          <button onClick={() => navigate(-1)} className="p-2 -ml-2 rounded-full hover:bg-zinc-900 text-zinc-400">
+            <ChevronLeft size={22} />
+          </button>
+          <h1 className="text-lg font-bold tracking-tight text-white ml-2">Delivery History</h1>
+        </div>
       </header>
 
-      <div className="relative z-10 space-y-4">
-        {orders.length > 0 ? (
-          orders.map(order => (
-            <div key={order.id} className="glass-card p-4 hover:border-[var(--color-sky)]/50 transition-colors">
-              <div 
-                className="cursor-pointer"
-                onClick={() => navigate(`/tracking/${order.id}?type=marketplace`)}
-              >
-                <div className="flex justify-between items-start mb-3">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 bg-[var(--color-sky)]/10 rounded-full flex items-center justify-center">
-                      <Package className="w-5 h-5 text-[var(--color-sky)]" />
-                    </div>
-                    <div>
-                      <p className="font-bold text-[var(--text-main)]">Order #{order.id.substring(0,6)}</p>
-                      <p className="text-xs font-medium text-[var(--text-muted)] mt-0.5">{new Date(order.created_at).toLocaleDateString()}</p>
-                    </div>
-                  </div>
-                  <span className="text-xs font-bold uppercase tracking-wider bg-[var(--bg-page)] px-2 py-1 rounded-md border border-[var(--border-color)] text-[var(--text-main)]">
-                    {order.status === 'delivered' ? 'Completed' : 'Active'}
-                  </span>
-                </div>
-                
-                <div className="bg-[var(--bg-page)]/50 rounded-xl p-3 border border-[var(--border-color)]">
-                  {order.items?.map((item: any, i: number) => (
-                    <div key={i} className="flex justify-between items-center text-sm mb-1 last:mb-0">
-                      <span className="font-medium text-[var(--text-main)] truncate mr-2">{item.qty}x {item.name}</span>
-                      <span className="font-bold text-[var(--text-muted)]">₹{item.price * item.qty}</span>
-                    </div>
-                  ))}
-                </div>
-                
-                <div className="flex justify-between items-center mt-3 pt-3 border-t border-[var(--border-color)]">
-                  <div className="flex items-center text-xs font-semibold text-[var(--text-muted)]">
-                    <Clock className="w-3.5 h-3.5 mr-1" />
-                    <span>{new Date(order.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
-                  </div>
-                  <span className="font-bold text-[var(--text-main)]">
-                    Total: ₹{order.items?.reduce((acc: number, curr: any) => acc + (curr.price * curr.qty), 0)}
-                  </span>
-                </div>
-              </div>
-
-              {/* RATINGS & REVIEWS SECTION */}
-              {order.status === 'delivered' && (
-                <div className="mt-3 pt-3 border-t border-[var(--border-color)] flex justify-end">
-                  <button 
-                    onClick={(e) => { e.stopPropagation(); setRatingModal({ isOpen: true, orderId: order.id }); }}
-                    className="flex items-center text-sm font-bold text-[var(--color-sky)] hover:text-sky-400 transition-colors"
-                  >
-                    <Star className="w-4 h-4 mr-1" />
-                    Rate Order
-                  </button>
-                </div>
-              )}
-            </div>
-          ))
-        ) : (
-          <p className="text-[var(--text-muted)] text-center py-10 font-medium">No previous orders found.</p>
-        )}
+      {/* Stats Banner */}
+      <div className="w-full overflow-x-auto pt-6 pb-2 scrollbar-hide">
+        <div className="flex gap-3 px-5 min-w-max">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 flex flex-col min-w-[130px]">
+            <Package size={18} className="text-zinc-400 mb-2" />
+            <div className="text-2xl font-bold font-mono text-white">{totalDeliveries}</div>
+            <div className="text-[11px] text-zinc-600 mt-1 font-medium">Total Deliveries</div>
+          </div>
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 flex flex-col min-w-[130px]">
+            <MapPin size={18} className="text-amber-400 mb-2" />
+            <div className="text-2xl font-bold font-mono text-white">{distanceSaved.toFixed(1)} <span className="text-sm text-zinc-500">km</span></div>
+            <div className="text-[11px] text-zinc-600 mt-1 font-medium">Distance Saved</div>
+          </div>
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 flex flex-col min-w-[130px]">
+            <Calendar size={18} className="text-zinc-400 mb-2" />
+            <div className="text-2xl font-bold font-mono text-white">{thisMonthCount}</div>
+            <div className="text-[11px] text-zinc-600 mt-1 font-medium">This Month</div>
+          </div>
+        </div>
       </div>
 
-      {/* RATING MODAL */}
-      <AnimatePresence>
-        {ratingModal.isOpen && (
-          <motion.div 
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm"
-          >
-            <motion.div 
-              initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }}
-              className="bg-[var(--bg-page)] border border-[var(--border-color)] p-6 rounded-2xl w-full max-w-sm relative"
+      {/* Delivery List */}
+      <div className="px-5 py-6">
+        {deliveries.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <div className="w-16 h-16 bg-zinc-900 border border-zinc-800 rounded-full flex items-center justify-center mb-5">
+              <Package size={28} className="text-zinc-600" />
+            </div>
+            <h2 className="text-base font-bold tracking-tight text-white mb-1">No deliveries yet</h2>
+            <p className="text-[13px] text-zinc-600 mb-8">You haven't sent or received any packages.</p>
+            <button 
+              onClick={() => navigate('/send')}
+              className="bg-white text-zinc-900 font-semibold px-6 py-3 rounded-xl text-sm hover:bg-zinc-200 transition-colors"
             >
-              <button 
-                onClick={() => setRatingModal({ isOpen: false, orderId: null })}
-                className="absolute top-4 right-4 text-[var(--text-muted)] hover:text-[var(--text-main)]"
-              >
-                <X className="w-5 h-5" />
-              </button>
-              
-              <h2 className="text-xl font-bold text-[var(--text-main)] mb-1">Rate Delivery</h2>
-              <p className="text-sm text-[var(--text-muted)] mb-6">How was your RoCAR experience?</p>
-              
-              <div className="flex justify-center space-x-2 mb-6">
-                {[1, 2, 3, 4, 5].map(star => (
-                  <button 
-                    key={star} 
-                    onClick={() => setRatingValue(star)}
-                    className="p-1 transition-transform hover:scale-110 focus:outline-none"
-                  >
-                    <Star className={`w-8 h-8 ${star <= ratingValue ? 'fill-yellow-400 text-yellow-400' : 'text-[var(--border-color)]'}`} />
-                  </button>
-                ))}
-              </div>
-              
-              <textarea
-                value={reviewText}
-                onChange={e => setReviewText(e.target.value)}
-                placeholder="Leave a review (optional)..."
-                className="w-full bg-[var(--bg-page)]/50 border border-[var(--border-color)] rounded-xl p-3 text-[var(--text-main)] text-sm mb-4 h-24 focus:outline-none focus:border-[var(--color-sky)]"
-              />
-              
-              <button 
-                onClick={handleSubmitReview}
-                className="w-full bg-[var(--color-sky)] text-white font-bold py-3 rounded-xl hover:bg-sky-600 transition-colors"
-              >
-                Submit Review
-              </button>
-            </motion.div>
+              Send your first package
+            </button>
+          </div>
+        ) : (
+          <motion.div variants={stagger} initial="hidden" animate="show" className="flex flex-col gap-2">
+            {deliveries.map((delivery) => {
+              const isSender = delivery.sender_id === userId;
+              return (
+                <motion.div
+                  key={delivery.id}
+                  variants={fadeUp}
+                  onClick={() => navigate(`/tracking/${delivery.id}`)}
+                  className="bg-zinc-900 border border-zinc-800 rounded-xl p-3.5 flex items-center gap-3 cursor-pointer hover:border-zinc-700 transition-colors"
+                >
+                  <div className="w-10 h-10 rounded-lg bg-zinc-800 border border-zinc-700 flex items-center justify-center shrink-0">
+                    {isSender ? <Send size={16} className="text-zinc-300" /> : <ArrowDownToLine size={16} className="text-zinc-300" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[13px] font-semibold text-white truncate tracking-tight">
+                      {delivery.package_details || 'Package'}
+                    </div>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className={`text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                        delivery.status === 'completed' ? 'bg-emerald-500/10 text-emerald-400' :
+                        delivery.status === 'in_transit' || delivery.status === 'delivering' ? 'bg-amber-500/10 text-amber-400' :
+                        'bg-zinc-800 text-zinc-500'
+                      }`}>
+                        {delivery.status.replace('_', ' ')}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="text-[11px] text-zinc-600 font-mono whitespace-nowrap">
+                    {timeAgo(delivery.created_at)}
+                  </div>
+                </motion.div>
+              );
+            })}
           </motion.div>
         )}
-      </AnimatePresence>
-    </motion.div>
+      </div>
+    </div>
   );
 }

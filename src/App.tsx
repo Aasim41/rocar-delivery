@@ -2,14 +2,13 @@ import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
 import { Onboarding } from './pages/Onboarding';
-import { Marketplace } from './pages/Marketplace';
+import { Dashboard } from './pages/Dashboard';
+import { SendPackage } from './pages/SendPackage';
+import { FetchPackage } from './pages/FetchPackage';
 import { OrderTracking } from './pages/OrderTracking';
 import { Login } from './pages/Login';
-import { ShopPortal } from './pages/ShopPortal';
-import { ShopPage } from './pages/ShopPage';
 import { Profile } from './pages/Profile';
 import { OrderHistory } from './pages/OrderHistory';
-import { Reviews } from './pages/Reviews';
 import { supabase } from './lib/supabase';
 import { registerPushNotifications, initPushNotificationListeners } from './lib/pushNotifications';
 import { Loader2 } from 'lucide-react';
@@ -165,16 +164,8 @@ function AppRoutes() {
     return <Navigate to="/login" replace />;
   }
 
-  if (userRole === 'shop_owner' && location.pathname !== '/shop-portal') {
-    return <Navigate to="/shop-portal" replace />;
-  }
-
-  if (userRole === 'buyer' && location.pathname === '/shop-portal') {
-    return <Navigate to="/" replace />;
-  }
-
   if (session && location.pathname === '/login') {
-    return <Navigate to={userRole === 'shop_owner' ? '/shop-portal' : '/'} replace />;
+    return <Navigate to="/" replace />;
   }
 
   return (
@@ -183,13 +174,12 @@ function AppRoutes() {
         <Routes location={location} key={location.pathname}>
           <Route path="/onboarding" element={<Onboarding onComplete={() => setHasSeenOnboarding(true)} />} />
           <Route path="/login" element={<Login />} />
-          <Route path="/shop-portal" element={<ShopPortal />} />
-          <Route path="/" element={<Marketplace />} />
-          <Route path="/shop/:shopId" element={<ShopPage />} />
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/send" element={<SendPackage />} />
+          <Route path="/fetch" element={<FetchPackage />} />
           <Route path="/tracking/:id" element={<OrderTracking />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/orders" element={<OrderHistory />} />
-          <Route path="/reviews" element={<Reviews />} />
         </Routes>
       </AnimatePresence>
     </>
