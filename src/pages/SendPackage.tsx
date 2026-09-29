@@ -381,7 +381,7 @@ export function SendPackage() {
       y: 0,
       transition: {
         delay: i * 0.1,
-        type: 'spring',
+        type: 'spring' as const,
         stiffness: 300,
         damping: 24,
       }
