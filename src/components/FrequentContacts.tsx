@@ -111,7 +111,7 @@ export const FrequentContacts: React.FC<FrequentContactsProps> = ({ onSelect, ex
 
   const itemVariants = {
     hidden: { opacity: 0, scale: 0.8 },
-    show: { opacity: 1, scale: 1, transition: { type: 'spring', stiffness: 300, damping: 20 } },
+    show: { opacity: 1, scale: 1, transition: { type: 'spring' as const, stiffness: 300, damping: 20 } },
   };
 
   return (

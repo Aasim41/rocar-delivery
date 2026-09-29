@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Search, MapPin, Crosshair, Map as MapIcon, X, Check } from 'lucide-react';
+import { ArrowLeft, Search, MapPin, Crosshair, Map as MapIcon, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { SwipeToConfirm } from '../components/SwipeToConfirm';
 

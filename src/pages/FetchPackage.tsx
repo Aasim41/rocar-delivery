@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  ArrowLeft, Search, MapPin, Navigation, Save, 
-  Check, X, User, Package, Box
+  ArrowLeft, Search, MapPin, Navigation, 
+  X, User, Box
 } from 'lucide-react';
 import { useLoadScript, GoogleMap, Marker } from '@react-google-maps/api';
 import { supabase } from '../lib/supabase';

@@ -17,7 +17,7 @@ import { Toaster, toast } from 'react-hot-toast';
 function AppRoutes() {
   const location = useLocation();
   const [session, setSession] = useState<any>(null);
-  const [userRole, setUserRole] = useState<'buyer' | 'shop_owner' | null>(null);
+  const [_userRole, setUserRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const [hasSeenOnboarding, setHasSeenOnboarding] = useState(() => {
