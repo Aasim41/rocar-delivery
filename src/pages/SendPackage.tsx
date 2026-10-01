@@ -163,7 +163,7 @@ function FullscreenMapPicker({ onConfirm, onClose, initialCoords }: {
       className="fixed inset-0 z-[100] bg-zinc-950 flex flex-col"
     >
       {/* Search Bar */}
-      <div className="absolute top-0 left-0 right-0 z-10 p-4 pt-12">
+      <div className="absolute top-0 left-0 right-0 z-10 p-4 pt-20">
         <div className="relative max-w-md mx-auto">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
           <input
