@@ -433,3 +433,9 @@
   0% { transform: translateX(0%); }
   100% { transform: translateX(-50%); }
 }
+
+.pac-container { z-index: 99999 !important; background-color: #18181b !important; border: 1px solid #27272a !important; font-family: inherit !important; }
+.pac-item { color: #d4d4d8 !important; border-top: 1px solid #27272a !important; padding: 10px !important; }
+.pac-item-query { color: #fff !important; font-size: 15px !important; }
+.pac-matched { color: #34d399 !important; }
+

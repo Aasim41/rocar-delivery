@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Search, MapPin, Map as MapIcon, X, Navigation2, Box } from 'lucide-react';
@@ -144,7 +145,7 @@ function FullscreenMapPicker({ onConfirm, onClose, initialCoords }: {
     }
   }, []);
 
-  return (
+  return createPortal(
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
@@ -201,7 +202,8 @@ function FullscreenMapPicker({ onConfirm, onClose, initialCoords }: {
           </div>
         </motion.div>
       )}
-    </motion.div>
+    </motion.div>,
+    document.body
   );
 }
 
