@@ -1,3 +1,20 @@
+
+
+-- 0. Recreate users table
+DROP TABLE IF EXISTS public.users CASCADE;
+CREATE TABLE public.users (
+    id UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
+    name TEXT,
+    email TEXT,
+    avatar_url TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can view all users" ON public.users FOR SELECT USING (true);
+CREATE POLICY "Users can update their own profile" ON public.users FOR UPDATE USING (auth.uid() = id);
+CREATE POLICY "Users can insert their own profile" ON public.users FOR INSERT WITH CHECK (auth.uid() = id);
+
 -- ============================================
 -- ROCAR CAMPUS LOGISTICS - SUPABASE SETUP
 -- ============================================

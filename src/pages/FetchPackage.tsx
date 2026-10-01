@@ -1,511 +1,520 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  ArrowLeft, Search, MapPin, Navigation, 
-  X, User, Box
-} from 'lucide-react';
-import { useLoadScript, GoogleMap, Marker } from '@react-google-maps/api';
+import { ArrowLeft, Search, MapPin, Map as MapIcon, X, Navigation2, Box } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { SwipeToConfirm } from '../components/SwipeToConfirm';
 
-// Dark styled maps
-const mapStyles = [
-  { elementType: 'geometry', stylers: [{ color: '#242f3e' }] },
-  { elementType: 'labels.text.stroke', stylers: [{ color: '#242f3e' }] },
-  { elementType: 'labels.text.fill', stylers: [{ color: '#746855' }] },
-  { featureType: 'administrative.locality', elementType: 'labels.text.fill', stylers: [{ color: '#d59563' }] },
-  { featureType: 'poi', elementType: 'labels.text.fill', stylers: [{ color: '#d59563' }] },
-  { featureType: 'poi.park', elementType: 'geometry', stylers: [{ color: '#263c3f' }] },
-  { featureType: 'poi.park', elementType: 'labels.text.fill', stylers: [{ color: '#6b9a76' }] },
-  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#38414e' }] },
-  { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#212a37' }] },
-  { featureType: 'road', elementType: 'labels.text.fill', stylers: [{ color: '#9ca5b3' }] },
-  { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#746855' }] },
-  { featureType: 'road.highway', elementType: 'geometry.stroke', stylers: [{ color: '#1f2835' }] },
-  { featureType: 'road.highway', elementType: 'labels.text.fill', stylers: [{ color: '#f3d19c' }] },
-  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#17263c' }] },
-  { featureType: 'water', elementType: 'labels.text.fill', stylers: [{ color: '#515c6d' }] },
-  { featureType: 'water', elementType: 'labels.text.stroke', stylers: [{ color: '#17263c' }] },
-];
-
-const mapContainerStyle = { width: '100%', height: '250px', borderRadius: '0.75rem' };
-const defaultCenter = { lat: 37.7749, lng: -122.4194 }; // Placeholder fallback
-
-interface Profile {
+// --- Types ---
+interface User {
   id: string;
-  full_name: string;
+  name?: string;
   email: string;
 }
 
-interface Location {
-  id?: string;
-  name: string;
+interface SavedLocation {
+  id: string;
+  label: string;
   lat: number;
   lng: number;
 }
 
+interface LocationCoords {
+  lat: number;
+  lng: number;
+  address?: string;
+}
+
+// --- Hooks ---
+function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value);
+  useEffect(() => {
+    const handler = setTimeout(() => setDebouncedValue(value), delay);
+    return () => clearTimeout(handler);
+  }, [value, delay]);
+  return debouncedValue;
+}
+
+const GOOGLE_MAPS_API_KEY = 'AIzaSyBX0xNBFK24V2DZgMQHFku3tWcJWtVjgds';
+
+const darkMapStyles = [
+  { elementType: 'geometry', stylers: [{ color: '#18181b' }] },
+  { elementType: 'labels.text.stroke', stylers: [{ color: '#09090b' }] },
+  { elementType: 'labels.text.fill', stylers: [{ color: '#a1a1aa' }] },
+  { featureType: 'administrative.locality', elementType: 'labels.text.fill', stylers: [{ color: '#d4d4d8' }] },
+  { featureType: 'poi', elementType: 'labels.text.fill', stylers: [{ color: '#a1a1aa' }] },
+  { featureType: 'poi.park', elementType: 'geometry', stylers: [{ color: '#18181b' }] },
+  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#27272a' }] },
+  { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#18181b' }] },
+  { featureType: 'road', elementType: 'labels.text.fill', stylers: [{ color: '#a1a1aa' }] },
+  { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#3f3f46' }] },
+  { featureType: 'transit', elementType: 'geometry', stylers: [{ color: '#18181b' }] },
+  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#09090b' }] },
+  { featureType: 'water', elementType: 'labels.text.fill', stylers: [{ color: '#3f3f46' }] },
+];
+
+// --- Fullscreen Map Picker with Google Places Search ---
+function FullscreenMapPicker({ onConfirm, onClose, initialCoords }: {
+  onConfirm: (coords: LocationCoords) => void;
+  onClose: () => void;
+  initialCoords: LocationCoords | null;
+}) {
+  const mapRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const mapInstance = useRef<google.maps.Map | null>(null);
+  const markerInstance = useRef<google.maps.Marker | null>(null);
+  const [selectedCoords, setSelectedCoords] = useState<LocationCoords | null>(initialCoords);
+  const [address, setAddress] = useState('');
+  const geocoder = useRef<google.maps.Geocoder | null>(null);
+
+  const reverseGeocode = (lat: number, lng: number) => {
+    if (!geocoder.current) geocoder.current = new google.maps.Geocoder();
+    geocoder.current.geocode({ location: { lat, lng } }, (results, status) => {
+      if (status === 'OK' && results && results[0]) {
+        setAddress(results[0].formatted_address);
+      }
+    });
+  };
+
+  const placeMarker = (lat: number, lng: number) => {
+    setSelectedCoords({ lat, lng });
+    reverseGeocode(lat, lng);
+    if (!markerInstance.current) {
+      markerInstance.current = new google.maps.Marker({
+        position: { lat, lng },
+        map: mapInstance.current,
+        animation: google.maps.Animation.DROP,
+      });
+    } else {
+      markerInstance.current.setPosition({ lat, lng });
+    }
+    mapInstance.current?.panTo({ lat, lng });
+  };
+
+  useEffect(() => {
+    if (!mapRef.current) return;
+    const center = initialCoords || { lat: 24.4356, lng: 77.1607 };
+
+    mapInstance.current = new google.maps.Map(mapRef.current, {
+      center,
+      zoom: 18,
+      styles: darkMapStyles,
+      mapTypeId: 'hybrid',
+      disableDefaultUI: true,
+      zoomControl: true,
+      zoomControlOptions: { position: google.maps.ControlPosition.RIGHT_CENTER },
+      gestureHandling: 'greedy',
+    });
+
+    mapInstance.current.addListener('click', (e: google.maps.MapMouseEvent) => {
+      if (e.latLng) placeMarker(e.latLng.lat(), e.latLng.lng());
+    });
+
+    if (initialCoords) placeMarker(initialCoords.lat, initialCoords.lng);
+
+    // Google Places Autocomplete
+    if (searchRef.current) {
+      const autocomplete = new google.maps.places.Autocomplete(searchRef.current, {
+        types: ['establishment', 'geocode'],
+        componentRestrictions: { country: 'in' },
+      });
+      autocomplete.bindTo('bounds', mapInstance.current);
+      autocomplete.addListener('place_changed', () => {
+        const place = autocomplete.getPlace();
+        if (place.geometry?.location) {
+          const lat = place.geometry.location.lat();
+          const lng = place.geometry.location.lng();
+          placeMarker(lat, lng);
+          setAddress(place.formatted_address || place.name || '');
+          mapInstance.current?.setZoom(19);
+        }
+      });
+    }
+
+    // Center on user location if no initial coords
+    if (!initialCoords && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          mapInstance.current?.setCenter({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+          mapInstance.current?.setZoom(18);
+        },
+        () => {},
+        { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
+      );
+    }
+  }, []);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[100] bg-zinc-950 flex flex-col"
+    >
+      {/* Search Bar */}
+      <div className="absolute top-0 left-0 right-0 z-10 p-4 pt-12">
+        <div className="relative max-w-md mx-auto">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
+          <input
+            ref={searchRef}
+            type="text"
+            placeholder="Search a place..."
+            className="w-full bg-zinc-900/95 backdrop-blur-xl border border-zinc-700 rounded-2xl py-3.5 pl-11 pr-12 text-white placeholder-zinc-500 focus:outline-none focus:border-zinc-500 text-[15px]"
+          />
+          <button
+            onClick={onClose}
+            className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-zinc-800 hover:bg-zinc-700 transition-colors"
+          >
+            <X size={16} className="text-zinc-400" />
+          </button>
+        </div>
+      </div>
+
+      {/* Map */}
+      <div ref={mapRef} className="flex-1 w-full" />
+
+      {/* Bottom Confirm Panel */}
+      {selectedCoords && (
+        <motion.div
+          initial={{ y: 100, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          className="absolute bottom-0 left-0 right-0 bg-zinc-900/95 backdrop-blur-xl border-t border-zinc-800 p-5 pb-8"
+        >
+          <div className="max-w-md mx-auto">
+            <div className="flex items-start gap-3 mb-4">
+              <div className="p-2 bg-zinc-800 rounded-lg mt-0.5">
+                <MapPin size={16} className="text-white" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[13px] text-zinc-400 font-mono">
+                  {selectedCoords.lat.toFixed(7)}, {selectedCoords.lng.toFixed(7)}
+                </p>
+                {address && <p className="text-[13px] text-zinc-300 mt-1 truncate">{address}</p>}
+              </div>
+            </div>
+            <button
+              onClick={() => onConfirm({ ...selectedCoords, address })}
+              className="w-full bg-white text-zinc-900 font-semibold py-3.5 rounded-xl text-[15px] hover:bg-zinc-200 transition-colors active:scale-[0.98]"
+            >
+              Confirm Location
+            </button>
+          </div>
+        </motion.div>
+      )}
+    </motion.div>
+  );
+}
+
+// --- Location Selector ---
+const LocationSelector: React.FC<{
+  title: string;
+  savedLocations: SavedLocation[];
+  selectedLocation: LocationCoords | null;
+  onSelect: (coords: LocationCoords) => void;
+  saveLabel: string;
+  setSaveLabel: (label: string) => void;
+  willSave: boolean;
+  setWillSave: (save: boolean) => void;
+  mapsLoaded: boolean;
+}> = ({ title, savedLocations, selectedLocation, onSelect, saveLabel, setSaveLabel, willSave, setWillSave, mapsLoaded }) => {
+  const [showFullMap, setShowFullMap] = useState(false);
+
+  const handleCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      alert('Geolocation not supported.');
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (position) => onSelect({ lat: position.coords.latitude, lng: position.coords.longitude }),
+      () => alert('Could not get location. Enable GPS and try again.'),
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
+    );
+  };
+
+  return (
+    <div className="flex flex-col gap-3">
+      <h3 className="text-lg font-semibold tracking-tight text-white">{title}</h3>
+      
+      {savedLocations.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {savedLocations.map(loc => (
+            <button
+              key={loc.id}
+              onClick={() => onSelect({ lat: loc.lat, lng: loc.lng })}
+              className={`px-4 py-2 rounded-full text-sm transition-colors border ${
+                selectedLocation && selectedLocation.lat === loc.lat && selectedLocation.lng === loc.lng
+                  ? 'bg-white text-zinc-900 border-white font-semibold'
+                  : 'bg-zinc-900 border-zinc-700 text-zinc-200 hover:bg-zinc-800'
+              }`}
+            >
+              {loc.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div className="flex gap-2">
+        <button onClick={handleCurrentLocation} className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-zinc-900 text-white font-medium hover:bg-zinc-800 transition-colors border border-zinc-800">
+          <Navigation2 size={16} />
+          Current Location
+        </button>
+        <button onClick={() => setShowFullMap(true)} className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-zinc-900 text-zinc-200 hover:bg-zinc-800 transition-colors border border-zinc-800 font-medium">
+          <MapIcon size={16} />
+          Drop Pin
+        </button>
+      </div>
+
+      <AnimatePresence>
+        {showFullMap && mapsLoaded && (
+          <FullscreenMapPicker
+            initialCoords={selectedLocation}
+            onConfirm={(coords) => { onSelect(coords); setShowFullMap(false); }}
+            onClose={() => setShowFullMap(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      {selectedLocation && (
+        <motion.div initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} className="p-4 rounded-xl border border-zinc-800 bg-zinc-900 flex flex-col gap-3">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-zinc-800 rounded-lg"><MapPin className="text-white" size={18} /></div>
+            <div>
+              <p className="text-sm font-medium text-zinc-200">Location Selected</p>
+              <p className="text-xs text-zinc-500 font-mono mt-0.5">{selectedLocation.lat.toFixed(7)}, {selectedLocation.lng.toFixed(7)}</p>
+              {selectedLocation.address && <p className="text-xs text-zinc-400 mt-0.5">{selectedLocation.address}</p>}
+            </div>
+          </div>
+          <div className="border-t border-zinc-800 pt-3 flex flex-col gap-2">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" checked={willSave} onChange={(e) => setWillSave(e.target.checked)} className="w-4 h-4 rounded border-zinc-600 bg-zinc-800 accent-white" />
+              <span className="text-sm text-zinc-300">Save this location for later</span>
+            </label>
+            {willSave && (
+              <input type="text" placeholder="e.g. Their Office, Lab" value={saveLabel} onChange={(e) => setSaveLabel(e.target.value)} className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-zinc-600" />
+            )}
+          </div>
+        </motion.div>
+      )}
+    </div>
+  );
+};
+
+
+// --- Main Component ---
+
 export function FetchPackage() {
   const navigate = useNavigate();
   const [currentUser, setCurrentUser] = useState<any>(null);
-  
-  // Sender state
+  const [mapsLoaded, setMapsLoaded] = useState(false);
+
+  // Sender (who has the item)
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<Profile[]>([]);
-  const [selectedSender, setSelectedSender] = useState<Profile | null>(null);
+  const debouncedSearch = useDebounce(searchQuery, 300);
+  const [searchResults, setSearchResults] = useState<User[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [selectedSender, setSelectedSender] = useState<User | null>(null);
 
-  // Location state
-  const [savedLocations, setSavedLocations] = useState<Location[]>([]);
-  const [pickupLocation, setPickupLocation] = useState<Location | null>(null);
-  const [dropoffLocation, setDropoffLocation] = useState<Location | null>(null);
+  // Locations
+  const [savedLocations, setSavedLocations] = useState<SavedLocation[]>([]);
+  const [pickupCoords, setPickupCoords] = useState<LocationCoords | null>(null);
   const [savePickup, setSavePickup] = useState(false);
+  const [pickupLabel, setPickupLabel] = useState('');
+  const [dropoffCoords, setDropoffCoords] = useState<LocationCoords | null>(null);
   const [saveDropoff, setSaveDropoff] = useState(false);
-  
-  // UI state
-  const [showPickupMap, setShowPickupMap] = useState(false);
-  const [showDropoffMap, setShowDropoffMap] = useState(false);
+  const [dropoffLabel, setDropoffLabel] = useState('');
+
   const [itemDetails, setItemDetails] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const { isLoaded } = useLoadScript({
-    googleMapsApiKey: 'AIzaSyBX0xNBFK24V2DZgMQHFku3tWcJWtVjgds',
-  });
-
+  // Load Google Maps
   useEffect(() => {
-    const fetchUserAndLocations = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      setCurrentUser(user);
-      
-      if (user) {
-        const { data } = await supabase
-          .from('saved_locations')
-          .select('*')
-          .eq('user_id', user.id);
-        if (data) setSavedLocations(data);
-      }
-    };
-    fetchUserAndLocations();
+    if (window.google?.maps) { setMapsLoaded(true); return; }
+    const script = document.createElement('script');
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=places`;
+    script.async = true;
+    script.defer = true;
+    script.onload = () => setMapsLoaded(true);
+    document.head.appendChild(script);
   }, []);
 
-  // Debounced Search
   useEffect(() => {
-    const timer = setTimeout(async () => {
-      if (searchQuery.trim().length > 2 && currentUser) {
-        setIsSearching(true);
-        const { data } = await supabase
-          .from('profiles')
-          .select('id, full_name, email')
-          .ilike('full_name', `%${searchQuery}%`)
-          .neq('id', currentUser.id)
-          .limit(5);
-        
-        setSearchResults(data || []);
-        setIsSearching(false);
-      } else {
-        setSearchResults([]);
+    const fetchInit = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setCurrentUser(user);
+      if (user) {
+        const { data: locs } = await supabase.from('saved_locations').select('*').eq('user_id', user.id);
+        if (locs) setSavedLocations(locs);
       }
-    }, 300);
-    
-    return () => clearTimeout(timer);
-  }, [searchQuery, currentUser]);
-
-  const handleUseCurrentLocation = () => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setDropoffLocation({
-            name: 'Current Location',
-            lat: position.coords.latitude,
-            lng: position.coords.longitude
-          });
-        },
-        () => alert('Could not get current location.')
-      );
-    }
-  };
-
-  const handleMapClick = (e: google.maps.MapMouseEvent, type: 'pickup' | 'dropoff') => {
-    if (!e.latLng) return;
-    const loc = {
-      name: type === 'pickup' ? 'Pinned Pickup' : 'Pinned Dropoff',
-      lat: e.latLng.lat(),
-      lng: e.latLng.lng()
     };
-    if (type === 'pickup') setPickupLocation(loc);
-    else setDropoffLocation(loc);
+    fetchInit();
+  }, []);
+
+  useEffect(() => {
+    const searchUsers = async () => {
+      if (debouncedSearch.trim().length < 2) { setSearchResults([]); return; }
+      setIsSearching(true);
+      const { data, error } = await supabase
+        .from('users')
+        .select('id, name, email')
+        .or(`email.ilike.%${debouncedSearch}%,name.ilike.%${debouncedSearch}%`)
+        .neq('id', currentUser?.id || '')
+        .limit(5);
+      if (!error && data) setSearchResults(data);
+      setIsSearching(false);
+    };
+    searchUsers();
+  }, [debouncedSearch, currentUser]);
+
+  const canSubmit = pickupCoords !== null && dropoffCoords !== null;
+
+  const getMissingText = () => {
+    const missing: string[] = [];
+    if (!pickupCoords) missing.push('pickup');
+    if (!dropoffCoords) missing.push('dropoff');
+    if (missing.length > 0) return `Set ${missing.join(' & ')} location`;
+    return '';
   };
 
-  const onSubmit = async () => {
-    if (!currentUser || !selectedSender || !pickupLocation || !dropoffLocation) return;
-    
-    setIsSubmitting(true);
+  const handleConfirm = async () => {
+    if (!canSubmit || !currentUser) return;
     try {
-      // 1. Save locations if requested
-      if (savePickup) {
-        await supabase.from('saved_locations').insert({
-          user_id: currentUser.id,
-          name: pickupLocation.name,
-          lat: pickupLocation.lat,
-          lng: pickupLocation.lng
-        });
-      }
-      if (saveDropoff && dropoffLocation.name !== 'Current Location') {
-        await supabase.from('saved_locations').insert({
-          user_id: currentUser.id,
-          name: dropoffLocation.name,
-          lat: dropoffLocation.lat,
-          lng: dropoffLocation.lng
-        });
-      }
-
-      // 2. Create Delivery
-      // In FETCH mode: Current user wants item (Receiver). Selected user has item (Sender).
+      // In FETCH mode: current user is RECEIVER, selected person is SENDER
       const { data, error } = await supabase.from('deliveries').insert({
-        sender_id: selectedSender.id,
+        sender_id: selectedSender?.id || currentUser.id,
         receiver_id: currentUser.id,
-        pickup_lat: pickupLocation.lat,
-        pickup_lng: pickupLocation.lng,
-        dropoff_lat: dropoffLocation.lat,
-        dropoff_lng: dropoffLocation.lng,
-        item_details: itemDetails,
+        pickup_lat: pickupCoords.lat,
+        pickup_lng: pickupCoords.lng,
+        dropoff_lat: dropoffCoords.lat,
+        dropoff_lng: dropoffCoords.lng,
+        package_details: itemDetails || null,
+        delivery_type: 'fetch',
         status: 'pending',
-        delivery_type: 'fetch'
-      }).select().single();
+      }).select('id').single();
 
       if (error) throw error;
-      
-      // 3. Navigate to tracking
-      navigate(`/tracking/${data.id}`);
-    } catch (error) {
-      console.error('Error creating fetch request:', error);
-      alert('Failed to request fetch. Please try again.');
-    } finally {
-      setIsSubmitting(false);
+
+      if (savePickup && pickupLabel && pickupCoords) {
+        await supabase.from('saved_locations').insert({ user_id: currentUser.id, label: pickupLabel, lat: pickupCoords.lat, lng: pickupCoords.lng });
+      }
+      if (saveDropoff && dropoffLabel && dropoffCoords) {
+        await supabase.from('saved_locations').insert({ user_id: currentUser.id, label: dropoffLabel, lat: dropoffCoords.lat, lng: dropoffCoords.lng });
+      }
+
+      if (data?.id) navigate(`/tracking/${data.id}`);
+    } catch (err: any) {
+      console.error('Error creating fetch delivery:', err);
+      alert('Failed: ' + err.message);
     }
   };
 
-  const isValid = selectedSender && pickupLocation && dropoffLocation && !isSubmitting;
+  const staggerVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: (i: number) => ({
+      opacity: 1, y: 0,
+      transition: { delay: i * 0.1, type: 'spring' as const, stiffness: 300, damping: 24 }
+    })
+  };
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-white pb-24 font-sans">
-      {/* Header */}
-      <header className="sticky top-0 z-20 bg-zinc-950/80 backdrop-blur-md border-b border-zinc-800 p-4 flex items-center">
-        <button 
-          onClick={() => navigate(-1)}
-          className="p-2 -ml-2 rounded-full hover:bg-zinc-900 transition-colors"
-        >
-          <ArrowLeft className="w-6 h-6 text-zinc-300" />
+    <div className="min-h-screen bg-zinc-950 text-white flex flex-col max-w-md mx-auto w-full relative">
+      <header className="sticky top-0 z-40 bg-zinc-950/80 backdrop-blur-xl border-b border-zinc-800/50 px-5 py-4 flex items-center gap-4">
+        <button onClick={() => navigate(-1)} className="p-2 -ml-2 rounded-full hover:bg-zinc-900 transition-colors">
+          <ArrowLeft className="w-5 h-5" />
         </button>
-        <div className="ml-2">
-          <h1 className="text-xl font-semibold tracking-tight text-white">Fetch Item</h1>
-          <p className="text-xs text-zinc-500">Send an empty cart to collect something</p>
+        <div>
+          <h1 className="text-lg font-bold tracking-tight">Fetch Item</h1>
+          <p className="text-[12px] text-zinc-500">Send an empty cart to collect something</p>
         </div>
       </header>
 
-      <main className="p-4 max-w-md mx-auto space-y-8">
-        
-        {/* 1. Sender Selection */}
-        <motion.section 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="space-y-3"
-        >
-          <h2 className="text-sm font-semibold tracking-tight text-zinc-500 uppercase">Who has the item?</h2>
+      <main className="flex-1 overflow-y-auto px-5 py-6 flex flex-col gap-10 pb-32">
+
+        {/* Who has the item (optional) */}
+        <motion.section custom={0} initial="hidden" animate="visible" variants={staggerVariants} className="flex flex-col gap-3 relative z-30">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold tracking-tight">Who has the item?</h3>
+            <span className="text-[11px] text-zinc-600 uppercase tracking-wider">Optional</span>
+          </div>
           
-          <div className="glass-card bg-zinc-900 rounded-xl p-4 border border-zinc-700">
-            {selectedSender ? (
-              <div className="flex items-center justify-between bg-white/10 border border-zinc-600/30 p-3 rounded-lg">
-                <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
-                    <User className="w-5 h-5 text-white" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-zinc-200">{selectedSender.full_name}</p>
-                    <p className="text-xs text-zinc-500">{selectedSender.email}</p>
-                  </div>
-                </div>
-                <button 
-                  onClick={() => setSelectedSender(null)}
-                  className="p-2 text-zinc-500 hover:text-zinc-200"
-                >
-                  <X className="w-5 h-5" />
-                </button>
+          {selectedSender ? (
+            <div className="flex items-center justify-between p-4 rounded-xl border border-zinc-700 bg-zinc-900">
+              <div>
+                <p className="font-medium text-white">{selectedSender.name || selectedSender.email}</p>
+                {selectedSender.name && <p className="text-sm text-zinc-500">{selectedSender.email}</p>}
               </div>
-            ) : (
+              <button onClick={() => setSelectedSender(null)} className="p-2 rounded-full hover:bg-zinc-800 text-zinc-400 transition-colors">
+                <X size={18} />
+              </button>
+            </div>
+          ) : (
+            <div className="relative">
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Search className="h-5 w-5 text-zinc-600" />
-                </div>
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-600" size={18} />
                 <input
                   type="text"
-                  placeholder="Search by name..."
+                  placeholder="Search by name or email..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="block w-full pl-10 pr-3 py-3 border border-zinc-700 rounded-lg leading-5 bg-zinc-950 text-zinc-300 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-cyan-400 sm:text-sm transition-colors"
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl py-3 pl-11 pr-4 text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-600 transition-all text-[15px]"
                 />
-                
-                {/* Search Results Dropdown */}
-                <AnimatePresence>
-                  {searchQuery.length > 2 && (
-                    <motion.div 
-                      initial={{ opacity: 0, y: -10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10 }}
-                      className="absolute z-10 mt-2 w-full bg-zinc-900 border border-zinc-700 rounded-lg shadow-lg overflow-hidden"
-                    >
-                      {isSearching ? (
-                        <div className="p-4 text-center text-sm text-zinc-600">Searching...</div>
-                      ) : searchResults.length > 0 ? (
-                        <ul>
-                          {searchResults.map((user) => (
-                            <li 
-                              key={user.id}
-                              onClick={() => {
-                                setSelectedSender(user);
-                                setSearchQuery('');
-                                setSearchResults([]);
-                              }}
-                              className="px-4 py-3 hover:bg-zinc-800 cursor-pointer flex items-center space-x-3 transition-colors"
-                            >
-                              <div className="w-8 h-8 rounded-full bg-slate-600 flex items-center justify-center">
-                                <User className="w-4 h-4 text-zinc-300" />
-                              </div>
-                              <div>
-                                <p className="text-sm font-medium text-zinc-200">{user.full_name}</p>
-                                <p className="text-xs text-zinc-500">{user.email}</p>
-                              </div>
-                            </li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <div className="p-4 text-center text-sm text-zinc-600">No users found</div>
-                      )}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
               </div>
-            )}
-          </div>
-        </motion.section>
-
-        {/* 2. Pickup Location (Their Location) */}
-        <motion.section 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="space-y-3"
-        >
-          <h2 className="text-sm font-semibold tracking-tight text-zinc-500 uppercase">Their Location (Pickup)</h2>
-          <div className="glass-card bg-zinc-900 rounded-xl p-4 border border-zinc-700 space-y-4">
-            
-            {/* Saved Locations Chips */}
-            {savedLocations.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {savedLocations.map((loc, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => setPickupLocation(loc)}
-                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors border ${
-                      pickupLocation?.lat === loc.lat && pickupLocation?.lng === loc.lng
-                        ? 'bg-white/20 text-white border-zinc-600/50'
-                        : 'bg-zinc-950 text-zinc-300 border-zinc-700 hover:border-slate-500'
-                    }`}
-                  >
-                    {loc.name}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {/* Map Toggle */}
-            <button 
-              onClick={() => setShowPickupMap(!showPickupMap)}
-              className="w-full flex items-center justify-center space-x-2 py-2 border border-zinc-700 rounded-lg text-sm text-zinc-300 hover:bg-zinc-800/50 transition-colors"
-            >
-              <MapPin className="w-4 h-4" />
-              <span>{showPickupMap ? 'Hide Map' : 'Drop Pin on Map'}</span>
-            </button>
-
-            {/* Map Area */}
-            <AnimatePresence>
-              {showPickupMap && isLoaded && (
-                <motion.div 
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="overflow-hidden rounded-lg"
-                >
-                  <GoogleMap
-                    mapContainerStyle={mapContainerStyle}
-                    zoom={15}
-                    center={pickupLocation || defaultCenter}
-                    options={{ styles: mapStyles, disableDefaultUI: true }}
-                    onClick={(e) => handleMapClick(e, 'pickup')}
-                  >
-                    {pickupLocation && <Marker position={pickupLocation} />}
-                  </GoogleMap>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {/* Selected Coord Display */}
-            {pickupLocation && (
-              <div className="flex items-center justify-between bg-zinc-950 p-3 rounded-lg border border-zinc-700">
-                <div className="flex items-center space-x-2">
-                  <MapPin className="w-4 h-4 text-emerald-400" />
-                  <span className="text-sm text-zinc-300">{pickupLocation.name}</span>
-                </div>
-                <div className="text-xs text-zinc-600 font-mono">
-                  {pickupLocation.lat.toFixed(4)}, {pickupLocation.lng.toFixed(4)}
-                </div>
-              </div>
-            )}
-
-            {/* Save Toggle */}
-            {pickupLocation && pickupLocation.name === 'Pinned Pickup' && (
-              <label className="flex items-center space-x-2 cursor-pointer">
-                <input 
-                  type="checkbox" 
-                  checked={savePickup}
-                  onChange={(e) => setSavePickup(e.target.checked)}
-                  className="rounded border-zinc-700 bg-zinc-950 text-white focus:ring-cyan-400"
-                />
-                <span className="text-sm text-zinc-500">Save this location</span>
-              </label>
-            )}
-          </div>
-        </motion.section>
-
-        {/* 3. Dropoff Location (Your Location) */}
-        <motion.section 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="space-y-3"
-        >
-          <h2 className="text-sm font-semibold tracking-tight text-zinc-500 uppercase">Your Location (Dropoff)</h2>
-          <div className="glass-card bg-zinc-900 rounded-xl p-4 border border-zinc-700 space-y-4">
-            
-            <div className="flex flex-wrap gap-2">
-              <button
-                onClick={handleUseCurrentLocation}
-                className="flex items-center space-x-1 px-3 py-1.5 rounded-full text-xs font-medium bg-zinc-950 text-white border border-zinc-600/30 hover:bg-zinc-950/80 transition-colors"
-              >
-                <Navigation className="w-3 h-3" />
-                <span>Use Current Location</span>
-              </button>
-              
-              {savedLocations.map((loc, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => setDropoffLocation(loc)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors border ${
-                    dropoffLocation?.lat === loc.lat && dropoffLocation?.lng === loc.lng
-                      ? 'bg-white/20 text-white border-zinc-600/50'
-                      : 'bg-zinc-950 text-zinc-300 border-zinc-700 hover:border-slate-500'
-                  }`}
-                >
-                  {loc.name}
-                </button>
-              ))}
+              <AnimatePresence>
+                {searchQuery.trim().length >= 2 && !selectedSender && (
+                  <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="absolute top-full left-0 right-0 mt-2 bg-zinc-900 border border-zinc-700 rounded-xl shadow-xl overflow-hidden z-40 max-h-60 overflow-y-auto">
+                    {isSearching ? (
+                      <div className="p-4 text-center text-zinc-500 text-sm">Searching...</div>
+                    ) : searchResults.length > 0 ? (
+                      <ul>
+                        {searchResults.map(user => (
+                          <li key={user.id}>
+                            <button onClick={() => { setSelectedSender(user); setSearchQuery(''); }} className="w-full text-left p-4 hover:bg-zinc-800 transition-colors border-b border-zinc-800 last:border-0">
+                              <p className="font-medium text-zinc-200">{user.name || user.email}</p>
+                              {user.name && <p className="text-sm text-zinc-500">{user.email}</p>}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <div className="p-4 text-center text-zinc-500 text-sm">No users found</div>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
-
-            <button 
-              onClick={() => setShowDropoffMap(!showDropoffMap)}
-              className="w-full flex items-center justify-center space-x-2 py-2 border border-zinc-700 rounded-lg text-sm text-zinc-300 hover:bg-zinc-800/50 transition-colors"
-            >
-              <MapPin className="w-4 h-4" />
-              <span>{showDropoffMap ? 'Hide Map' : 'Drop Pin on Map'}</span>
-            </button>
-
-            <AnimatePresence>
-              {showDropoffMap && isLoaded && (
-                <motion.div 
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="overflow-hidden rounded-lg"
-                >
-                  <GoogleMap
-                    mapContainerStyle={mapContainerStyle}
-                    zoom={15}
-                    center={dropoffLocation || defaultCenter}
-                    options={{ styles: mapStyles, disableDefaultUI: true }}
-                    onClick={(e) => handleMapClick(e, 'dropoff')}
-                  >
-                    {dropoffLocation && <Marker position={dropoffLocation} />}
-                  </GoogleMap>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {dropoffLocation && (
-              <div className="flex items-center justify-between bg-zinc-950 p-3 rounded-lg border border-zinc-700">
-                <div className="flex items-center space-x-2">
-                  <MapPin className="w-4 h-4 text-rose-400" />
-                  <span className="text-sm text-zinc-300">{dropoffLocation.name}</span>
-                </div>
-                <div className="text-xs text-zinc-600 font-mono">
-                  {dropoffLocation.lat.toFixed(4)}, {dropoffLocation.lng.toFixed(4)}
-                </div>
-              </div>
-            )}
-
-            {dropoffLocation && dropoffLocation.name === 'Pinned Dropoff' && (
-              <label className="flex items-center space-x-2 cursor-pointer">
-                <input 
-                  type="checkbox" 
-                  checked={saveDropoff}
-                  onChange={(e) => setSaveDropoff(e.target.checked)}
-                  className="rounded border-zinc-700 bg-zinc-950 text-white focus:ring-cyan-400"
-                />
-                <span className="text-sm text-zinc-500">Save this location</span>
-              </label>
-            )}
-          </div>
+          )}
         </motion.section>
 
-        {/* 4. Item Details */}
-        <motion.section 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="space-y-3"
-        >
-          <h2 className="text-sm font-semibold tracking-tight text-zinc-500 uppercase">Item Details</h2>
-          <div className="glass-card bg-zinc-900 rounded-xl p-4 border border-zinc-700">
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 pt-3 pointer-events-none">
-                <Box className="h-5 w-5 text-zinc-600" />
-              </div>
-              <textarea
-                placeholder="What should they load? (e.g. Borrowed charger, blue folder)"
-                value={itemDetails}
-                onChange={(e) => setItemDetails(e.target.value)}
-                rows={3}
-                className="block w-full pl-10 pr-3 py-3 border border-zinc-700 rounded-lg leading-5 bg-zinc-950 text-zinc-300 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-cyan-400 sm:text-sm transition-colors resize-none"
-              />
-            </div>
-          </div>
+        {/* Pickup (where the item is) */}
+        <motion.section custom={1} initial="hidden" animate="visible" variants={staggerVariants} className="z-20">
+          <LocationSelector title="Their Location (Pickup)" savedLocations={savedLocations} selectedLocation={pickupCoords} onSelect={setPickupCoords} willSave={savePickup} setWillSave={setSavePickup} saveLabel={pickupLabel} setSaveLabel={setPickupLabel} mapsLoaded={mapsLoaded} />
         </motion.section>
 
-        {/* 5. Submit */}
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-          className="pt-4 pb-8"
-        >
-          <div className={`transition-opacity duration-300 ${isValid ? 'opacity-100' : 'opacity-50 pointer-events-none'}`}>
-            <SwipeToConfirm 
-              onConfirm={onSubmit}
-              text="Slide to request fetch"
-            />
-          </div>
-        </motion.div>
+        {/* Dropoff (where YOU are) */}
+        <motion.section custom={2} initial="hidden" animate="visible" variants={staggerVariants} className="z-10">
+          <LocationSelector title="Your Location (Dropoff)" savedLocations={savedLocations} selectedLocation={dropoffCoords} onSelect={setDropoffCoords} willSave={saveDropoff} setWillSave={setSaveDropoff} saveLabel={dropoffLabel} setSaveLabel={setDropoffLabel} mapsLoaded={mapsLoaded} />
+        </motion.section>
+
+        {/* Item Details */}
+        <motion.section custom={3} initial="hidden" animate="visible" variants={staggerVariants} className="flex flex-col gap-3">
+          <h3 className="text-lg font-semibold tracking-tight flex items-center gap-2">
+            <Box size={18} className="text-zinc-400" /> Item Details
+          </h3>
+          <textarea
+            rows={3}
+            placeholder="What should they load? (optional)"
+            value={itemDetails}
+            onChange={(e) => setItemDetails(e.target.value)}
+            className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-4 text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-600 transition-all resize-none text-[15px]"
+          />
+          <p className="text-[11px] text-zinc-700 ml-1">e.g. The blue folder on my desk, Borrowed charger</p>
+        </motion.section>
 
       </main>
+
+      {/* Footer */}
+      <div className="fixed bottom-0 left-0 right-0 max-w-md mx-auto p-4 bg-zinc-950/95 backdrop-blur-xl pt-6 z-50 border-t border-zinc-800/30">
+        <SwipeToConfirm onConfirm={handleConfirm} disabled={!canSubmit} text="Slide to request fetch" confirmedText="Requested!" />
+        {!canSubmit && <p className="text-center text-[11px] text-zinc-600 mt-2">{getMissingText()}</p>}
+      </div>
     </div>
   );
 }

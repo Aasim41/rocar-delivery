@@ -32,7 +32,7 @@ export function Dashboard() {
       .neq('status', 'completed')
       .order('created_at', { ascending: false })
       .limit(1)
-      .single();
+      .maybeSingle();
     
     setActiveDelivery(activeData || null);
 

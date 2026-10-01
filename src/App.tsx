@@ -10,193 +10,130 @@ import { Login } from './pages/Login';
 import { Profile } from './pages/Profile';
 import { OrderHistory } from './pages/OrderHistory';
 import { supabase } from './lib/supabase';
-import { registerPushNotifications, initPushNotificationListeners } from './lib/pushNotifications';
 import { Loader2 } from 'lucide-react';
 import { Toaster, toast } from 'react-hot-toast';
+import { App as CapacitorApp } from '@capacitor/app';
+import { Browser } from '@capacitor/browser';
 
 function AppRoutes() {
   const location = useLocation();
   const [session, setSession] = useState<any>(null);
-  const [_userRole, setUserRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-
   const [hasSeenOnboarding, setHasSeenOnboarding] = useState(() => {
-    return localStorage.getItem('demo_mode') === 'buyer' || localStorage.getItem('has_seen_onboarding') === 'true';
+    return localStorage.getItem('hasSeenOnboarding') === 'true';
   });
 
   useEffect(() => {
-    if (localStorage.getItem('theme') === 'dark' || (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-
-    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
-      setSession(currentSession);
-      if (currentSession) {
-        fetchUserProfile(currentSession.user.id, currentSession);
-        initPushNotificationListeners();
-        registerPushNotifications();
-      } else {
-        setLoading(false);
-      }
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      if (session) ensureUserProfile(session.user);
+      setLoading(false);
     });
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, currentSession) => {
-      setSession(currentSession);
-      if (currentSession) {
-        fetchUserProfile(currentSession.user.id, currentSession);
-        initPushNotificationListeners();
-        registerPushNotifications();
-      } else {
-        setUserRole(null);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setSession(session);
+        if (session) ensureUserProfile(session.user);
         setLoading(false);
       }
-    });
+    );
 
-    // Handle Deep Link for Google OAuth in Native APK
-    import('@capacitor/app').then(({ App: CapacitorApp }) => {
-      CapacitorApp.addListener('appUrlOpen', async (event) => {
-        if (event.url.includes('#access_token=')) {
-          // Close the Capacitor Browser overlay that we opened for OAuth
-          import('@capacitor/browser').then(({ Browser }) => {
-            Browser.close().catch(() => {});
-          });
-          
-          const url = new URL(event.url);
-          const hashParams = new URLSearchParams(url.hash.substring(1));
-          const accessToken = hashParams.get('access_token');
-          const refreshToken = hashParams.get('refresh_token');
-          if (accessToken && refreshToken) {
-            supabase.auth.setSession({
-              access_token: accessToken,
-              refresh_token: refreshToken
-            });
+    // Deep linking for Google OAuth login
+    CapacitorApp.addListener('appUrlOpen', async (event: any) => {
+      const url = event.url;
+      if (url.includes('rocar://login')) {
+        const hash = url.split('#')[1];
+        if (hash) {
+          const params = new URLSearchParams(hash);
+          const access_token = params.get('access_token');
+          const refresh_token = params.get('refresh_token');
+          if (access_token && refresh_token) {
+            await supabase.auth.setSession({ access_token, refresh_token });
+            await Browser.close();
           }
         }
-      });
+      }
     }).catch(() => {});
 
     return () => subscription.unsubscribe();
   }, []);
 
-  const fetchUserProfile = async (userId: string, currentSession: any) => {
+  const ensureUserProfile = async (user: any) => {
     try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('role')
-        .eq('id', userId)
-        .single();
-
-      if (error && error.code === 'PGRST116') {
-        const roleToInsert = currentSession?.user?.user_metadata?.role || 'buyer';
-        const nameToInsert = localStorage.getItem('onboarding_name') || '';
-        const ageStr = localStorage.getItem('onboarding_age');
-        const ageToInsert = ageStr ? parseInt(ageStr, 10) : null;
-        
-        const { data: newData, error: insertError } = await supabase
-          .from('users')
-          .insert([{ 
-            id: userId, 
-            role: roleToInsert,
-            name: nameToInsert,
-            age: ageToInsert
-          }])
-          .select('role')
-          .single();
-        
-        if (!insertError && newData) {
-          setUserRole(newData.role || roleToInsert);
-        } else {
-          if (insertError) {
-             toast.error(`Database Insert Error: ${insertError.message} (Code: ${insertError.code})`);
-             console.error("Insert error:", insertError);
-          }
-          setUserRole(roleToInsert);
+      const { data, error } = await supabase.from('users').select('id').eq('id', user.id).maybeSingle();
+      
+      if (!data && !error) {
+        // User doesn't exist in public.users yet, create them
+        const name = user.user_metadata?.name || user.user_metadata?.full_name || user.email?.split('@')[0] || 'User';
+        const { error: insertError } = await supabase.from('users').insert([{ 
+          id: user.id, 
+          name: name,
+          email: user.email,
+          avatar_url: user.user_metadata?.avatar_url
+        }]);
+        if (insertError) {
+          console.error("Failed to insert user profile:", insertError);
+          toast.error("Error creating user profile");
         }
-      } else if (data) {
-        setUserRole(data.role || 'buyer');
-        
-        const nameToInsert = localStorage.getItem('onboarding_name');
-        const ageStr = localStorage.getItem('onboarding_age');
-        
-        if (nameToInsert || ageStr) {
-           const updates: any = {};
-           if (nameToInsert) updates.name = nameToInsert;
-           if (ageStr) updates.age = parseInt(ageStr, 10);
-           
-           if (Object.keys(updates).length > 0) {
-              const { error: updateError } = await supabase.from('users').update(updates).eq('id', userId);
-              if (updateError) {
-                toast.error(`Database Update Error: ${updateError.message} (Code: ${updateError.code})`);
-                console.error("Update error:", updateError);
-              } else {
-                localStorage.removeItem('onboarding_name');
-                localStorage.removeItem('onboarding_age');
-              }
-           }
-        }
-      } else {
-        setUserRole('buyer');
       }
     } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
+      console.error("Error ensuring user profile:", err);
     }
+  };
+
+  const onOnboardingComplete = () => {
+    localStorage.setItem('hasSeenOnboarding', 'true');
+    setHasSeenOnboarding(true);
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[var(--bg-page)] flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-[var(--color-primary)] animate-spin" />
+      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-white animate-spin" />
       </div>
     );
   }
 
-  if (!hasSeenOnboarding && location.pathname !== '/onboarding') {
-    return <Navigate to="/onboarding" replace />;
-  }
-
-  if (hasSeenOnboarding && !session && location.pathname !== '/login' && location.pathname !== '/onboarding') {
-    return <Navigate to="/login" replace />;
-  }
-
-  if (session && location.pathname === '/login') {
-    return <Navigate to="/" replace />;
+  // Auth routing logic
+  if (!session) {
+    if (!hasSeenOnboarding && location.pathname !== '/onboarding') {
+      return <Navigate to="/onboarding" replace />;
+    }
+    if (hasSeenOnboarding && location.pathname !== '/login') {
+      return <Navigate to="/login" replace />;
+    }
+  } else {
+    // If logged in, block access to auth routes
+    if (location.pathname === '/login' || location.pathname === '/onboarding') {
+      return <Navigate to="/" replace />;
+    }
   }
 
   return (
-    <>
-      <AnimatePresence mode="wait">
-        <Routes location={location} key={location.pathname}>
-          <Route path="/onboarding" element={<Onboarding onComplete={() => setHasSeenOnboarding(true)} />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/send" element={<SendPackage />} />
-          <Route path="/fetch" element={<FetchPackage />} />
-          <Route path="/tracking/:id" element={<OrderTracking />} />
-          <Route path="/profile" element={<Profile />} />
-          <Route path="/orders" element={<OrderHistory />} />
-        </Routes>
-      </AnimatePresence>
-    </>
+    <AnimatePresence mode="wait">
+      <Routes location={location} key={location.pathname}>
+        <Route path="/onboarding" element={<Onboarding onComplete={onOnboardingComplete} />} />
+        <Route path="/login" element={<Login />} />
+        
+        {/* Protected Routes */}
+        <Route path="/" element={<Dashboard />} />
+        <Route path="/send" element={<SendPackage />} />
+        <Route path="/fetch" element={<FetchPackage />} />
+        <Route path="/tracking/:id" element={<OrderTracking />} />
+        <Route path="/profile" element={<Profile />} />
+        <Route path="/orders" element={<OrderHistory />} />
+      </Routes>
+    </AnimatePresence>
   );
 }
 
-function App() {
+export default function App() {
   return (
     <BrowserRouter>
-      <div className="flex flex-col min-h-screen bg-[var(--bg-page)] font-sans">
-        <main className="flex-1 overflow-x-hidden">
-          <AppRoutes />
-        </main>
-        <Toaster position="top-center" reverseOrder={false} />
-      </div>
+      <Toaster position="top-center" toastOptions={{ 
+        style: { background: '#18181b', color: '#fff', border: '1px solid #27272a' }
+      }} />
+      <AppRoutes />
     </BrowserRouter>
   );
 }
-
-export default App;
