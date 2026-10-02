@@ -32,6 +32,7 @@ export const initPushNotificationListeners = () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (session) {
       await supabase.from('users').update({ push_token: token.value }).eq('id', session.user.id);
+      console.log('Push token saved to Supabase:', token.value);
     }
   });
 

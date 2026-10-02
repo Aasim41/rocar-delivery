@@ -7,6 +7,7 @@ CREATE TABLE public.users (
     name TEXT,
     email TEXT,
     avatar_url TEXT,
+    push_token TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 

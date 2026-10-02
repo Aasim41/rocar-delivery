@@ -156,11 +156,23 @@ export function OrderTracking() {
   }, [id]);
 
   // Connect to backend WebSocket (non-blocking)
+  // When we receive a phase change, also write it back to Supabase
+  const lastSyncedPhase = useRef<string>('');
+
   useEffect(() => {
     const cleanup = connectToCartWS(
       (data: CartUpdate) => {
         if (data.cart) setCartPos(data.cart);
-        if (data.phase) setPhase(data.phase);
+        if (data.phase) {
+          setPhase(data.phase);
+          // Sync phase to Supabase so it persists across refreshes
+          if (id && data.phase !== lastSyncedPhase.current) {
+            lastSyncedPhase.current = data.phase;
+            const updates: any = { status: data.phase };
+            if (data.phase === 'completed') updates.completed_at = new Date().toISOString();
+            supabase.from('deliveries').update(updates).eq('id', id).then(() => {});
+          }
+        }
         if (data.speed !== undefined) setSpeed(data.speed);
         if (data.eta_seconds !== undefined) setEta(data.eta_seconds);
         if (data.route_points) setRoutePoints(data.route_points);
@@ -168,7 +180,7 @@ export function OrderTracking() {
       (connected) => setWsConnected(connected),
     );
     return cleanup;
-  }, []);
+  }, [id]);
 
   // ─── SIMULATION MODE ──────────────────────────────────
   const startSimulation = useCallback(() => {
