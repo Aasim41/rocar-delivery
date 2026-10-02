@@ -182,7 +182,7 @@ export function OrderTracking() {
     return cleanup;
   }, [id]);
 
-  // ─── SIMULATION MODE ──────────────────────────────────
+  // ─── SIMULATION MODE (Follows exact on-road waypoints) ─────────
   const startSimulation = useCallback(() => {
     if (!delivery || simRunning) return;
 
@@ -190,20 +190,18 @@ export function OrderTracking() {
     const pickup = { lat: delivery.pickup_lat, lng: delivery.pickup_lng };
     const dropoff = { lat: delivery.dropoff_lat, lng: delivery.dropoff_lng };
 
-    // Phase 1: Cart starts near pickup, approaches it
-    const startOffset = { lat: pickup.lat - 0.002, lng: pickup.lng - 0.001 };
-    const toPickup = interpolatePoints(startOffset, pickup, 40);
-    const toDropoff = interpolatePoints(pickup, dropoff, 80);
-    const allPoints = [...toPickup, ...toDropoff];
+    // Use road waypoints if loaded, otherwise interpolate
+    const pts = (routePoints && routePoints.length > 2)
+      ? routePoints
+      : interpolatePoints(pickup, dropoff, 40);
 
     let step = 0;
     setPhase('HEADING_TO_SENDER');
     setSpeed(3.2);
-    setEta(allPoints.length * 2);
+    setEta(pts.length * 2);
 
     simInterval.current = setInterval(() => {
-      if (step >= allPoints.length) {
-        // Simulation complete
+      if (step >= pts.length) {
         setPhase('AWAITING_RETRIEVAL');
         setSpeed(0);
         setEta(0);
@@ -212,26 +210,22 @@ export function OrderTracking() {
         return;
       }
 
-      const pos = allPoints[step];
+      const pos = pts[step];
       setCartPos(pos);
-      setEta((allPoints.length - step) * 2);
+      setEta(Math.max(0, (pts.length - step) * 2));
 
-      // Phase transitions
-      if (step === toPickup.length - 1) {
+      if (step === 0) {
         setPhase('AWAITING_LOAD');
         setSpeed(0);
-      } else if (step === toPickup.length + 3) {
+      } else if (step === 2) {
         setPhase('DELIVERING');
-        setSpeed(4.1);
-      } else if (step > toPickup.length + 3) {
-        // Vary speed slightly for realism
-        setSpeed(3.5 + Math.random() * 1.5);
+        setSpeed(3.8);
       }
 
       step++;
-    }, 800); // Update every 800ms
+    }, 500);
 
-  }, [delivery, simRunning]);
+  }, [delivery, simRunning, routePoints]);
 
   // Cleanup simulation on unmount
   useEffect(() => {
@@ -283,23 +277,31 @@ export function OrderTracking() {
       title: 'Dropoff',
     });
 
-    // Route line between pickup and dropoff
-    new google.maps.Polyline({
-      path: [
-        { lat: delivery.pickup_lat, lng: delivery.pickup_lng },
-        { lat: delivery.dropoff_lat, lng: delivery.dropoff_lng },
-      ],
-      geodesic: true,
-      strokeColor: '#3f3f46',
-      strokeOpacity: 0.4,
-      strokeWeight: 2,
-      map: mapInstance.current,
-    });
-
     const bounds = new google.maps.LatLngBounds();
     bounds.extend({ lat: delivery.pickup_lat, lng: delivery.pickup_lng });
     bounds.extend({ lat: delivery.dropoff_lat, lng: delivery.dropoff_lng });
     mapInstance.current.fitBounds(bounds, 60);
+
+    // Fetch on-road route via Google DirectionsService if not provided yet
+    if (window.google?.maps?.DirectionsService) {
+      const directionsService = new google.maps.DirectionsService();
+      directionsService.route(
+        {
+          origin: { lat: delivery.pickup_lat, lng: delivery.pickup_lng },
+          destination: { lat: delivery.dropoff_lat, lng: delivery.dropoff_lng },
+          travelMode: google.maps.TravelMode.WALKING,
+        },
+        (result, status) => {
+          if (status === google.maps.DirectionsStatus.OK && result?.routes[0]?.overview_path) {
+            const roadPts = result.routes[0].overview_path.map((p) => ({
+              lat: p.lat(),
+              lng: p.lng(),
+            }));
+            setRoutePoints(roadPts);
+          }
+        }
+      );
+    }
   }, [mapsLoaded, delivery]);
 
   useEffect(() => { initMap(); }, [initMap]);
@@ -360,16 +362,16 @@ export function OrderTracking() {
     mapInstance.current.panTo(cartPos);
   }, [cartPos]);
 
-  // Update route polyline from WebSocket
+  // Update route polyline along real road
   useEffect(() => {
     if (!mapInstance.current || routePoints.length === 0) return;
     if (routePoly.current) routePoly.current.setMap(null);
     routePoly.current = new google.maps.Polyline({
       path: routePoints,
       geodesic: true,
-      strokeColor: '#a1a1aa',
-      strokeOpacity: 0.5,
-      strokeWeight: 3,
+      strokeColor: '#3b82f6',
+      strokeOpacity: 0.9,
+      strokeWeight: 4,
       map: mapInstance.current,
     });
   }, [routePoints]);

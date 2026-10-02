@@ -14,6 +14,7 @@ import { Loader2 } from 'lucide-react';
 import { Toaster, toast } from 'react-hot-toast';
 import { App as CapacitorApp } from '@capacitor/app';
 import { Browser } from '@capacitor/browser';
+import { registerPushNotifications, initPushNotificationListeners } from './lib/pushNotifications';
 
 function AppRoutes() {
   const location = useLocation();
@@ -24,16 +25,25 @@ function AppRoutes() {
   });
 
   useEffect(() => {
+    // Initialize push notifications listeners on native devices
+    initPushNotificationListeners();
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
-      if (session) ensureUserProfile(session.user);
+      if (session) {
+        ensureUserProfile(session.user);
+        registerPushNotifications();
+      }
       setLoading(false);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
         setSession(session);
-        if (session) ensureUserProfile(session.user);
+        if (session) {
+          ensureUserProfile(session.user);
+          registerPushNotifications();
+        }
         setLoading(false);
       }
     );

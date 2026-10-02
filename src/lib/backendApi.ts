@@ -6,16 +6,27 @@
  * - WebSocket endpoint for live cart tracking
  */
 
+import { Capacitor } from '@capacitor/core';
+
 // Backend URL — stored in localStorage so user can configure it
 const BACKEND_KEY = 'rocar_backend_url';
-const DEFAULT_BACKEND = 'http://192.168.1.100:8000';
 
 export function getBackendUrl(): string {
-  return localStorage.getItem(BACKEND_KEY) || DEFAULT_BACKEND;
+  if (typeof window !== 'undefined') {
+    const saved = localStorage.getItem(BACKEND_KEY);
+    if (saved) return saved;
+
+    const host = window.location.hostname;
+    // Inside a native mobile app APK, hostname is 'localhost', so point to laptop IP
+    if (Capacitor.isNativePlatform() || !host || host === 'localhost') {
+      return 'http://10.110.87.59:8000';
+    }
+    return `http://${host}:8000`;
+  }
+  return 'http://10.110.87.59:8000';
 }
 
 export function setBackendUrl(url: string): void {
-  // Strip trailing slash
   const clean = url.replace(/\/+$/, '');
   localStorage.setItem(BACKEND_KEY, clean);
 }
