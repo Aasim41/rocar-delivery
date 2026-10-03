@@ -14,16 +14,18 @@ const BACKEND_KEY = 'rocar_backend_url';
 export function getBackendUrl(): string {
   if (typeof window !== 'undefined') {
     const saved = localStorage.getItem(BACKEND_KEY);
-    if (saved) return saved;
+    if (saved && !saved.includes('192.168.1.100') && !saved.includes('10.110.87.59')) {
+      return saved;
+    }
 
     const host = window.location.hostname;
     // Inside a native mobile app APK, hostname is 'localhost', so point to laptop IP
     if (Capacitor.isNativePlatform() || !host || host === 'localhost') {
-      return 'http://10.110.87.59:8000';
+      return 'http://192.168.20.20:8000';
     }
     return `http://${host}:8000`;
   }
-  return 'http://10.110.87.59:8000';
+  return 'http://192.168.20.20:8000';
 }
 
 export function setBackendUrl(url: string): void {
