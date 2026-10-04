@@ -6,26 +6,25 @@
  * - WebSocket endpoint for live cart tracking
  */
 
-import { Capacitor } from '@capacitor/core';
-
-// Backend URL — stored in localStorage so user can configure it
+const PRODUCTION_BACKEND = 'https://rocar-object-detection-production.up.railway.app';
 const BACKEND_KEY = 'rocar_backend_url';
 
 export function getBackendUrl(): string {
   if (typeof window !== 'undefined') {
     const saved = localStorage.getItem(BACKEND_KEY);
-    if (saved && !saved.includes('192.168.1.100') && !saved.includes('10.110.87.59') && !saved.includes('192.168.20.20')) {
+    if (
+      saved &&
+      !saved.includes('192.168.1.100') &&
+      !saved.includes('10.110.87.59') &&
+      !saved.includes('192.168.20.20') &&
+      !saved.includes('10.45.207.59')
+    ) {
       return saved;
     }
 
-    const host = window.location.hostname;
-    // Inside a native mobile app APK, hostname is 'localhost', so point to laptop IP
-    if (Capacitor.isNativePlatform() || !host || host === 'localhost') {
-      return 'http://10.45.207.59:8000';
-    }
-    return `http://${host}:8000`;
+    return PRODUCTION_BACKEND;
   }
-  return 'http://10.45.207.59:8000';
+  return PRODUCTION_BACKEND;
 }
 
 export function setBackendUrl(url: string): void {
