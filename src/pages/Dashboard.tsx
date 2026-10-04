@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence } from 'framer-motion';
 import { useGSAP } from '@gsap/react';
 import gsap from 'gsap';
 import { supabase } from '../lib/supabase';
@@ -63,9 +63,8 @@ export function Dashboard() {
     return () => { supabase.removeChannel(channel); };
   }, [userId]);
 
-  // GSAP: Ambient breathing orbs and smooth entrance choreography
+  // GSAP: Ambient breathing floating orbs
   useGSAP(() => {
-    // Ambient floating orbs (subtle cosmic breathing)
     if (orb1Ref.current) {
       gsap.to(orb1Ref.current, {
         x: '+=30',
@@ -91,14 +90,6 @@ export function Dashboard() {
         ease: 'sine.inOut',
       });
     }
-
-    // Staggered cinematic entrance
-    const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
-    tl.from('.gsap-header', { y: -25, opacity: 0, duration: 0.7 })
-      .from('.gsap-banner', { y: 20, opacity: 0, scale: 0.98, duration: 0.6 }, '-=0.4')
-      .from('.gsap-fleet', { y: 20, opacity: 0, duration: 0.5 }, '-=0.3')
-      .from('.gsap-action-card', { y: 25, opacity: 0, stagger: 0.12, duration: 0.6 }, '-=0.3')
-      .from('.gsap-activity', { y: 15, opacity: 0, duration: 0.5 }, '-=0.2');
   }, { scope: containerRef });
 
   return (
@@ -209,48 +200,46 @@ export function Dashboard() {
         <div className="grid grid-cols-2 gap-3.5 pt-1">
           
           {/* SEND PACKAGE CARD — Deep Midnight Navy Gradient */}
-          <motion.div 
-            whileTap={{ scale: 0.97 }}
+          <div 
             onClick={() => navigate('/send')}
-            className="gsap-action-card card-navy-glass rounded-2xl p-5 flex flex-col justify-between h-44 cursor-pointer hover:border-blue-500/60 hover:shadow-[0_8px_30px_rgba(20,40,90,0.4)] transition-all group relative overflow-hidden"
+            className="card-navy-glass rounded-2xl p-5 flex flex-col justify-between h-44 cursor-pointer hover:border-blue-400 hover:shadow-[0_8px_30px_rgba(20,40,90,0.5)] transition-all duration-200 active:scale-[0.97] group relative overflow-hidden"
           >
             {/* Subtle corner light flare */}
-            <div className="absolute -top-8 -right-8 w-24 h-24 bg-blue-500/15 rounded-full blur-xl group-hover:bg-blue-400/25 transition-all" />
+            <div className="absolute -top-8 -right-8 w-24 h-24 bg-blue-500/20 rounded-full blur-xl group-hover:bg-blue-400/30 transition-all pointer-events-none" />
 
-            <div className="w-11 h-11 rounded-xl bg-blue-950/80 border border-blue-800/50 flex items-center justify-center text-blue-300 group-hover:text-white group-hover:bg-blue-900/80 transition-all shadow-sm">
+            <div className="w-12 h-12 rounded-2xl bg-blue-950/90 border border-blue-600/50 flex items-center justify-center text-blue-300 group-hover:text-white group-hover:bg-blue-900/80 transition-all shadow-md">
               <Send className="w-5 h-5" />
             </div>
             <div className="relative z-10">
-              <h3 className="font-extrabold text-white tracking-tight text-[17px] group-hover:text-blue-100 transition-colors">
+              <h3 className="font-black text-white tracking-tight text-[18px] group-hover:text-blue-100 transition-colors">
                 Send
               </h3>
-              <p className="text-[11px] text-slate-400 mt-1 leading-snug">
+              <p className="text-[11px] text-blue-200/70 mt-1 leading-snug">
                 Dispatch item to someone on campus
               </p>
             </div>
-          </motion.div>
+          </div>
 
           {/* FETCH ITEM CARD — Deep Dark Crimson / Burgundy / Wine Gradient */}
-          <motion.div 
-            whileTap={{ scale: 0.97 }}
+          <div 
             onClick={() => navigate('/fetch')}
-            className="gsap-action-card card-crimson-glass rounded-2xl p-5 flex flex-col justify-between h-44 cursor-pointer hover:border-rose-700/60 hover:shadow-[0_8px_30px_rgba(70,12,25,0.45)] transition-all group relative overflow-hidden"
+            className="card-crimson-glass rounded-2xl p-5 flex flex-col justify-between h-44 cursor-pointer hover:border-rose-400 hover:shadow-[0_8px_30px_rgba(70,12,25,0.5)] transition-all duration-200 active:scale-[0.97] group relative overflow-hidden"
           >
             {/* Subtle corner light flare */}
-            <div className="absolute -top-8 -right-8 w-24 h-24 bg-rose-600/15 rounded-full blur-xl group-hover:bg-rose-500/25 transition-all" />
+            <div className="absolute -top-8 -right-8 w-24 h-24 bg-rose-600/20 rounded-full blur-xl group-hover:bg-rose-500/30 transition-all pointer-events-none" />
 
-            <div className="w-11 h-11 rounded-xl bg-rose-950/80 border border-rose-900/50 flex items-center justify-center text-rose-300 group-hover:text-white group-hover:bg-rose-900/80 transition-all shadow-sm">
+            <div className="w-12 h-12 rounded-2xl bg-rose-950/90 border border-rose-600/50 flex items-center justify-center text-rose-300 group-hover:text-white group-hover:bg-rose-900/80 transition-all shadow-md">
               <ArrowDownToLine className="w-5 h-5" />
             </div>
             <div className="relative z-10">
-              <h3 className="font-extrabold text-white tracking-tight text-[17px] group-hover:text-rose-100 transition-colors">
+              <h3 className="font-black text-white tracking-tight text-[18px] group-hover:text-rose-100 transition-colors">
                 Fetch
               </h3>
-              <p className="text-[11px] text-rose-200/60 mt-1 leading-snug">
+              <p className="text-[11px] text-rose-200/70 mt-1 leading-snug">
                 Request an empty cart to collect an item
               </p>
             </div>
-          </motion.div>
+          </div>
         </div>
 
         {/* Recent Activity Section */}
