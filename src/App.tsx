@@ -15,6 +15,8 @@ import { Toaster, toast } from 'react-hot-toast';
 import { App as CapacitorApp } from '@capacitor/app';
 import { Browser } from '@capacitor/browser';
 import { registerPushNotifications, initPushNotificationListeners } from './lib/pushNotifications';
+import { setupNotifications } from './lib/notifications';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 function AppRoutes() {
   const location = useLocation();
@@ -25,8 +27,9 @@ function AppRoutes() {
   });
 
   useEffect(() => {
-    // Initialize push notifications listeners on native devices
+    // Initialize push notifications & campus engagement reminders
     initPushNotificationListeners();
+    setupNotifications();
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
@@ -143,7 +146,9 @@ export default function App() {
       <Toaster position="top-center" toastOptions={{ 
         style: { background: '#18181b', color: '#fff', border: '1px solid #27272a' }
       }} />
-      <AppRoutes />
+      <ErrorBoundary>
+        <AppRoutes />
+      </ErrorBoundary>
     </BrowserRouter>
   );
 }
