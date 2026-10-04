@@ -1,71 +1,96 @@
 import { Capacitor } from '@capacitor/core';
 import { PushNotifications } from '@capacitor/push-notifications';
+import { LocalNotifications } from '@capacitor/local-notifications';
 import { toast } from 'react-hot-toast';
 import { supabase } from './supabase';
 
 // Cool campus reminder messages
 const CAMPUS_REMINDERS = [
   {
-    title: '⚡ RoCAR Fleet Online',
+    title: '⚡ AutoDrop Fleet Online',
     body: 'Need something fetched from the lab or library? Send a cart in 1 tap!',
   },
   {
     title: '🎒 Skip the campus walk!',
-    body: 'RoCAR is parked and ready. Dispatch packages across campus in minutes.',
+    body: 'AutoDrop is parked and ready. Dispatch packages across campus in minutes.',
   },
   {
     title: '🤖 Zero-emission micro logistics',
-    body: 'Quiet, electric, and autonomous. RoCAR makes campus deliveries effortless.',
+    body: 'Quiet, electric, and autonomous. AutoDrop makes campus deliveries effortless.',
   },
   {
     title: '📦 Got items to return?',
-    body: 'Use Fetch Mode to have RoCAR collect borrowed chargers, books, or notes.',
+    body: 'Use Fetch Mode to have AutoDrop collect borrowed chargers, books, or notes.',
   },
 ];
 
 /**
- * Initialize all notification systems (Web + Native Capacitor)
+ * Initialize all notification systems (Local Native + Push + Web)
  */
 export async function setupNotifications() {
   try {
-    // 1. Web Notification API (for Chrome / Android browser / Desktop)
+    // 1. Native Local Notifications (for Android status bar / lockscreen notifications)
+    if (Capacitor.isNativePlatform()) {
+      try {
+        const permStatus = await LocalNotifications.checkPermissions();
+        if (permStatus.display !== 'granted') {
+          await LocalNotifications.requestPermissions();
+        }
+
+        // Create high-importance Android Notification Channel
+        await LocalNotifications.createChannel({
+          id: 'autodrop_channel',
+          name: 'AutoDrop Deliveries',
+          description: 'Real-time alerts for delivery arrivals and updates',
+          importance: 5, // High priority / heads-up notification
+          visibility: 1, // Visible on lockscreen
+          vibration: true,
+          lights: true,
+          lightColor: '#ef4444',
+        });
+      } catch (err) {
+        console.warn('Local notifications channel init:', err);
+      }
+    }
+
+    // 2. Web Notification API (for Desktop / Browser fallback)
     if (typeof window !== 'undefined' && 'Notification' in window) {
       if (Notification.permission === 'default') {
-        // Request on user interaction
         Notification.requestPermission().then((perm) => {
           if (perm === 'granted') {
-            sendLocalNotification('🔔 RoCAR Notifications Active', 'You will receive real-time updates when carts arrive!');
+            sendLocalNotification('🔔 AutoDrop Notifications Active', 'You will receive real-time updates when carts arrive!');
           }
         }).catch(() => {});
       }
     }
 
-    // 2. Native Capacitor Push Notifications (when running as native APK)
+    // 3. Native Capacitor Push Notifications (when FCM is configured)
     if (Capacitor.isNativePlatform()) {
-      let permStatus = await PushNotifications.checkPermissions();
-      if (permStatus.receive === 'prompt') {
-        permStatus = await PushNotifications.requestPermissions();
-      }
-      if (permStatus.receive === 'granted') {
-        await PushNotifications.register();
-      }
-
-      PushNotifications.addListener('registration', async (token) => {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.user) {
-          await supabase.from('users').update({ push_token: token.value }).eq('id', session.user.id);
+      try {
+        let permStatus = await PushNotifications.checkPermissions();
+        if (permStatus.receive === 'prompt') {
+          permStatus = await PushNotifications.requestPermissions();
         }
-      });
+        if (permStatus.receive === 'granted') {
+          await PushNotifications.register();
+        }
 
-      PushNotifications.addListener('pushNotificationReceived', (notification) => {
-        toast(notification.title || 'Delivery update', {
-          icon: '🤖',
-          duration: 5000,
+        PushNotifications.addListener('registration', async (token) => {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session?.user) {
+            await supabase.from('users').update({ push_token: token.value }).eq('id', session.user.id);
+          }
         });
-      });
+
+        PushNotifications.addListener('pushNotificationReceived', (notification) => {
+          sendLocalNotification(notification.title || 'AutoDrop Update', notification.body || 'New delivery status update');
+        });
+      } catch (err) {
+        console.warn('Push registration notice:', err);
+      }
     }
 
-    // 3. Start smart periodic campus reminders (every 4 hours, or simulated demo)
+    // 4. Start smart periodic campus reminders
     startPeriodicReminders();
   } catch (err) {
     console.warn('Notifications setup notice:', err);
@@ -73,10 +98,10 @@ export async function setupNotifications() {
 }
 
 /**
- * Send an immediate notification (Web + Native + In-App Toast)
+ * Send an immediate notification (Native System Status Bar + In-App Toast + Web)
  */
 export function sendLocalNotification(title: string, body: string, icon = '🤖') {
-  // Always show in-app toast
+  // 1. In-app toast (when app is active/in foreground)
   toast(
     () => (
       <div className="flex items-start gap-3">
@@ -98,8 +123,27 @@ export function sendLocalNotification(title: string, body: string, icon = '🤖'
     }
   );
 
-  // System Notification if permitted
-  if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+  // 2. Native Android system notification (posts to system status bar & notification shade)
+  if (Capacitor.isNativePlatform()) {
+    try {
+      LocalNotifications.schedule({
+        notifications: [
+          {
+            id: Math.floor(Math.random() * 2000000000),
+            title,
+            body,
+            channelId: 'autodrop_channel',
+            schedule: { at: new Date(Date.now() + 100) },
+          },
+        ],
+      }).catch((err) => {
+        console.warn('Local notification schedule err:', err);
+      });
+    } catch (err) {
+      console.warn('Local notification trigger err:', err);
+    }
+  } else if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+    // 3. Web Notification fallback
     try {
       new Notification(title, {
         body,
@@ -107,7 +151,7 @@ export function sendLocalNotification(title: string, body: string, icon = '🤖'
         badge: '/vite.svg',
       });
     } catch {
-      // Fallback in environments that restrict direct Notification constructor
+      // restricted environment
     }
   }
 }
@@ -120,24 +164,21 @@ let reminderInterval: any = null;
 function startPeriodicReminders() {
   if (reminderInterval) return;
 
-  // Check last reminder timestamp in localStorage
-  const lastReminder = localStorage.getItem('rocar_last_reminder');
+  const lastReminder = localStorage.getItem('autodrop_last_reminder');
   const now = Date.now();
   const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
-  // If user hasn't seen a reminder in 12 hours, trigger one after 15 seconds of app usage
   if (!lastReminder || now - Number(lastReminder) > ONE_DAY_MS / 2) {
     setTimeout(() => {
       const randomMsg = CAMPUS_REMINDERS[Math.floor(Math.random() * CAMPUS_REMINDERS.length)];
       sendLocalNotification(randomMsg.title, randomMsg.body, '⚡');
-      localStorage.setItem('rocar_last_reminder', String(Date.now()));
+      localStorage.setItem('autodrop_last_reminder', String(Date.now()));
     }, 15000);
   }
 
-  // Periodic interval (every 6 hours if app stays open or on recurring visit)
   reminderInterval = setInterval(() => {
     const randomMsg = CAMPUS_REMINDERS[Math.floor(Math.random() * CAMPUS_REMINDERS.length)];
     sendLocalNotification(randomMsg.title, randomMsg.body, '🚀');
-    localStorage.setItem('rocar_last_reminder', String(Date.now()));
+    localStorage.setItem('autodrop_last_reminder', String(Date.now()));
   }, 6 * 60 * 60 * 1000);
 }

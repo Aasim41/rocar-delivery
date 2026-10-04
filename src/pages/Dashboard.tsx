@@ -113,7 +113,7 @@ export function Dashboard() {
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-black text-white tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
-              RoCAR
+              AutoDrop
             </h1>
             <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_8px_#3b82f6]" />
           </div>
@@ -165,7 +165,7 @@ export function Dashboard() {
                       {activeDelivery.package_details || 'Package'}
                     </h3>
                     <p className="text-[11px] text-slate-400 mt-1 flex items-center gap-1.5">
-                      <MapPin className="w-3 h-3 text-rose-400" /> In transit via RoCAR
+                      <MapPin className="w-3 h-3 text-rose-400" /> In transit via AutoDrop
                     </p>
                   </div>
                   <div className="flex items-center text-white text-[12px] font-bold bg-white/10 border border-white/10 px-3 py-1.5 rounded-xl group-hover:bg-white/20 transition-all shadow-sm">

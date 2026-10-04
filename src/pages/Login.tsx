@@ -138,7 +138,7 @@ export function Login() {
             <div className="absolute inset-0 border border-blue-400/20 rounded-2xl animate-ping opacity-30" />
           </div>
           <h1 className="text-3xl font-black tracking-tight bg-gradient-to-r from-white via-slate-200 to-indigo-200 bg-clip-text text-transparent">
-            RoCAR
+            AutoDrop
           </h1>
           <p className="text-blue-300/60 text-xs mt-1.5 tracking-[0.2em] font-semibold uppercase">Campus Autonomous Logistics</p>
         </div>

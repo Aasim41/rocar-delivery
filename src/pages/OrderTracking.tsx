@@ -220,9 +220,9 @@ export function OrderTracking() {
 
             // Trigger notification on milestone arrival
             if (newPhase === 'AWAITING_RETRIEVAL') {
-              sendLocalNotification('🎉 RoCAR Arrived!', 'Your package has arrived! Tap to unlock the cargo bay.', '📍');
+              sendLocalNotification('🎉 AutoDrop Arrived!', 'Your package has arrived! Tap to unlock the cargo bay.', '📍');
             } else if (newPhase === 'DELIVERING') {
-              sendLocalNotification('📦 Package on the way!', 'RoCAR is driving to your location.', '🚀');
+              sendLocalNotification('📦 Package on the way!', 'AutoDrop is driving to your location.', '🚀');
             }
           }
         }
@@ -367,7 +367,7 @@ export function OrderTracking() {
             strokeWeight: 2,
             rotation: 0,
           },
-          title: 'RoCAR Cart',
+          title: 'AutoDrop Cart',
           zIndex: 100,
         });
       } else {
@@ -422,7 +422,7 @@ export function OrderTracking() {
         setSpeed(0);
         setEta(0);
         setSimRunning(false);
-        sendLocalNotification('🎉 RoCAR Arrived!', 'Your package is ready! Tap Unlock to open cargo.', '📍');
+        sendLocalNotification('🎉 AutoDrop Arrived!', 'Your package is ready! Tap Unlock to open cargo.', '📍');
         if (simInterval.current) clearInterval(simInterval.current);
         return;
       }
@@ -477,7 +477,7 @@ export function OrderTracking() {
 
       setPhase('COMPLETED');
       setCargoState('LOCKED');
-      sendLocalNotification('✅ Delivery Complete!', 'Thank you for using RoCAR Autonomous Logistics.', '🎉');
+      sendLocalNotification('✅ Delivery Complete!', 'Thank you for using AutoDrop Autonomous Logistics.', '🎉');
     } catch (err) {
       // Offline fallback
       await supabase.from('deliveries').update({
@@ -486,7 +486,7 @@ export function OrderTracking() {
       }).eq('id', id);
       setPhase('COMPLETED');
       setCargoState('LOCKED');
-      sendLocalNotification('✅ Delivery Complete! (Demo)', 'Thank you for using RoCAR Autonomous Logistics.', '🎉');
+      sendLocalNotification('✅ Delivery Complete! (Demo)', 'Thank you for using AutoDrop Autonomous Logistics.', '🎉');
     } finally {
       setIsCompleting(false);
     }
@@ -499,7 +499,7 @@ export function OrderTracking() {
       await supabase.from('deliveries').update({ status: 'DELIVERING' }).eq('id', id);
       setPhase('DELIVERING');
       setCargoState('LOCKED');
-      sendLocalNotification('🚀 Cart Dispatched!', 'RoCAR is on the way to the receiver.', '📦');
+      sendLocalNotification('🚀 Cart Dispatched!', 'AutoDrop is on the way to the receiver.', '📦');
     } catch {
       await supabase.from('deliveries').update({ status: 'DELIVERING' }).eq('id', id);
       setPhase('DELIVERING');
@@ -516,7 +516,7 @@ export function OrderTracking() {
     return (
       <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center gap-3">
         <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin" />
-        <p className="text-zinc-500 text-sm font-medium">Connecting to RoCAR fleet...</p>
+        <p className="text-zinc-500 text-sm font-medium">Connecting to AutoDrop fleet...</p>
       </div>
     );
   }
@@ -686,7 +686,7 @@ export function OrderTracking() {
                 <ShieldCheck size={24} />
               </div>
               <div>
-                <h3 className="font-bold text-white text-[15px]">RoCAR is Ready for Collection</h3>
+                <h3 className="font-bold text-white text-[15px]">AutoDrop is Ready for Collection</h3>
                 <p className="text-xs text-slate-300">Tap below to open the cargo bay latch.</p>
               </div>
             </div>
@@ -735,7 +735,7 @@ export function OrderTracking() {
                 <Scan size={24} />
               </div>
               <div>
-                <h3 className="font-bold text-white text-[15px]">RoCAR Arrived at Pickup</h3>
+                <h3 className="font-bold text-white text-[15px]">AutoDrop Arrived at Pickup</h3>
                 <p className="text-xs text-slate-300">Load package into cargo compartment.</p>
               </div>
             </div>
