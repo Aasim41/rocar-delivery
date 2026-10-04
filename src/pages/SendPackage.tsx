@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useGSAP } from '@gsap/react';
+import gsap from 'gsap';
 import { ArrowLeft, Search, MapPin, Map as MapIcon, X, Navigation2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { SwipeToConfirm } from '../components/SwipeToConfirm';
@@ -264,7 +266,7 @@ const LocationSelector: React.FC<{
 
   return (
     <div className="flex flex-col gap-3">
-      <h3 className="text-lg font-semibold tracking-tight text-white">{title}</h3>
+      <h3 className="text-base font-semibold tracking-tight text-slate-200">{title}</h3>
       
       {/* Saved Locations */}
       {savedLocations.length > 0 && (
@@ -273,10 +275,10 @@ const LocationSelector: React.FC<{
             <button
               key={loc.id}
               onClick={() => onSelect({ lat: loc.lat, lng: loc.lng })}
-              className={`px-4 py-2 rounded-full text-sm transition-colors border ${
+              className={`px-3.5 py-1.5 rounded-full text-xs transition-all border ${
                 selectedLocation && selectedLocation.lat === loc.lat && selectedLocation.lng === loc.lng
-                  ? 'bg-white text-zinc-900 border-white font-semibold'
-                  : 'bg-zinc-900 border-zinc-700 text-zinc-200 hover:bg-zinc-800'
+                  ? 'bg-blue-600 text-white border-blue-400 font-semibold shadow-[0_0_12px_rgba(59,130,246,0.3)]'
+                  : 'bg-slate-900/60 border-indigo-950/70 text-slate-300 hover:bg-indigo-950/30'
               }`}
             >
               {loc.label}
@@ -289,16 +291,16 @@ const LocationSelector: React.FC<{
       <div className="flex gap-2">
         <button
           onClick={handleCurrentLocation}
-          className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-zinc-900 text-white font-medium hover:bg-zinc-800 transition-colors border border-zinc-800"
+          className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-slate-900/60 text-slate-200 font-medium hover:bg-indigo-950/30 transition-all border border-indigo-950/70 hover:border-indigo-700/40 text-xs"
         >
-          <Navigation2 size={16} />
+          <Navigation2 size={15} className="text-blue-400" />
           Current Location
         </button>
         <button
           onClick={() => setShowFullMap(true)}
-          className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-zinc-900 text-zinc-200 hover:bg-zinc-800 transition-colors border border-zinc-800 font-medium"
+          className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-slate-900/60 text-slate-200 hover:bg-indigo-950/30 transition-all border border-indigo-950/70 hover:border-indigo-700/40 font-medium text-xs"
         >
-          <MapIcon size={16} />
+          <MapIcon size={15} className="text-indigo-400" />
           Drop Pin
         </button>
       </div>
@@ -322,32 +324,32 @@ const LocationSelector: React.FC<{
         <motion.div
           initial={{ opacity: 0, y: 5 }}
           animate={{ opacity: 1, y: 0 }}
-          className="p-4 rounded-xl border border-zinc-800 bg-zinc-900 flex flex-col gap-3"
+          className="p-4 rounded-2xl card-navy-glass flex flex-col gap-3"
         >
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-zinc-800 rounded-lg">
-              <MapPin className="text-white" size={18} />
+            <div className="p-2.5 bg-indigo-950/60 border border-indigo-800/40 rounded-xl text-blue-400">
+              <MapPin size={18} />
             </div>
             <div>
-              <p className="text-sm font-medium text-zinc-200">Location Selected</p>
-              <p className="text-xs text-zinc-500 font-mono mt-0.5">
+              <p className="text-xs font-semibold text-blue-200">Location Selected</p>
+              <p className="text-[11px] text-blue-300/60 font-mono mt-0.5">
                 {selectedLocation.lat.toFixed(7)}, {selectedLocation.lng.toFixed(7)}
               </p>
               {selectedLocation.address && (
-                <p className="text-xs text-zinc-400 mt-0.5">{selectedLocation.address}</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">{selectedLocation.address}</p>
               )}
             </div>
           </div>
           
-          <div className="border-t border-zinc-800 pt-3 flex flex-col gap-2">
+          <div className="border-t border-indigo-950/60 pt-3 flex flex-col gap-2">
             <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
                 checked={willSave}
                 onChange={(e) => setWillSave(e.target.checked)}
-                className="w-4 h-4 rounded border-zinc-600 text-white focus:ring-0 bg-zinc-800 accent-white"
+                className="w-4 h-4 rounded border-indigo-900 text-blue-600 focus:ring-0 bg-slate-900 accent-blue-600"
               />
-              <span className="text-sm text-zinc-300">Save this location for later</span>
+              <span className="text-xs text-slate-300">Save this location for later</span>
             </label>
             {willSave && (
               <input
@@ -355,7 +357,7 @@ const LocationSelector: React.FC<{
                 placeholder="e.g. My Dorm, Library"
                 value={saveLabel}
                 onChange={(e) => setSaveLabel(e.target.value)}
-                className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-zinc-600"
+                className="w-full bg-slate-900/80 border border-indigo-950/70 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500/50"
               />
             )}
           </div>
@@ -370,6 +372,24 @@ const LocationSelector: React.FC<{
 
 export function SendPackage() {
   const navigate = useNavigate();
+  const containerRef = useRef<HTMLDivElement>(null);
+  const orbRef = useRef<HTMLDivElement>(null);
+
+  useGSAP(() => {
+    if (orbRef.current) {
+      gsap.to(orbRef.current, {
+        x: '+=25',
+        y: '+=20',
+        scale: 1.15,
+        opacity: 0.55,
+        duration: 9,
+        repeat: -1,
+        yoyo: true,
+        ease: 'sine.inOut',
+      });
+    }
+  }, { scope: containerRef });
+
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [mapsLoaded, setMapsLoaded] = useState(false);
   
@@ -524,22 +544,33 @@ export function SendPackage() {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-white flex flex-col max-w-md mx-auto w-full relative">
+    <div ref={containerRef} className="min-h-screen bg-[#050814] text-slate-100 flex flex-col max-w-md mx-auto w-full relative overflow-hidden font-sans">
+      {/* GSAP Ambient Floating Navy/Indigo Orbs */}
+      <div 
+        ref={orbRef}
+        className="pointer-events-none absolute -top-24 -left-20 w-80 h-80 rounded-full bg-gradient-to-br from-blue-700/20 via-indigo-900/15 to-transparent blur-3xl opacity-40 z-0"
+      />
+      <div 
+        className="pointer-events-none absolute top-1/2 -right-24 w-80 h-80 rounded-full bg-gradient-to-tl from-indigo-950/25 via-blue-950/15 to-transparent blur-3xl opacity-30 z-0"
+      />
+
       {/* Header */}
-      <header className="sticky top-0 z-40 bg-zinc-950/80 backdrop-blur-xl border-b border-zinc-800/50 px-5 py-4 flex items-center gap-4">
+      <header className="sticky top-0 z-40 bg-[#050814]/80 backdrop-blur-xl border-b border-indigo-950/50 px-5 py-4 flex items-center gap-4 relative">
         <button 
           onClick={() => navigate(-1)}
-          className="p-2 -ml-2 rounded-full hover:bg-zinc-900 transition-colors"
+          className="p-2 -ml-2 rounded-full hover:bg-indigo-950/40 text-slate-300 transition-colors"
         >
           <ArrowLeft className="w-5 h-5" />
         </button>
         <div>
-          <h1 className="text-lg font-bold tracking-tight">Send Package</h1>
-          <p className="text-[12px] text-zinc-500">Dispatch a package to someone on campus</p>
+          <h1 className="text-lg font-bold tracking-tight bg-gradient-to-r from-white via-slate-200 to-indigo-200 bg-clip-text text-transparent">
+            Send Package
+          </h1>
+          <p className="text-[12px] text-blue-300/50">Dispatch a package to someone on campus</p>
         </div>
       </header>
 
-      <main className="flex-1 overflow-y-auto px-5 py-6 flex flex-col gap-10 pb-32">
+      <main className="flex-1 overflow-y-auto px-5 py-6 flex flex-col gap-8 pb-32 relative z-10">
         
         {/* Receiver Selection (optional) */}
         <motion.section 
@@ -547,19 +578,19 @@ export function SendPackage() {
           className="flex flex-col gap-3 relative z-30"
         >
           <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold tracking-tight">Receiver</h3>
-            <span className="text-[11px] text-zinc-600 uppercase tracking-wider">Optional</span>
+            <h3 className="text-base font-semibold tracking-tight text-slate-200">Receiver</h3>
+            <span className="text-[10px] text-blue-300/60 uppercase tracking-wider font-semibold">Optional</span>
           </div>
           
           {selectedReceiver ? (
-            <div className="flex items-center justify-between p-4 rounded-xl border border-zinc-700 bg-zinc-900">
+            <div className="flex items-center justify-between p-4 rounded-2xl card-navy-glass border border-indigo-900/40">
               <div>
-                <p className="font-medium text-white">{selectedReceiver.name || selectedReceiver.email}</p>
-                {selectedReceiver.name && <p className="text-sm text-zinc-500">{selectedReceiver.email}</p>}
+                <p className="font-semibold text-white">{selectedReceiver.name || selectedReceiver.email}</p>
+                {selectedReceiver.name && <p className="text-xs text-blue-300/60 mt-0.5">{selectedReceiver.email}</p>}
               </div>
               <button 
                 onClick={() => setSelectedReceiver(null)}
-                className="p-2 rounded-full hover:bg-zinc-800 text-zinc-400 transition-colors"
+                className="p-2 rounded-full hover:bg-indigo-950/50 text-slate-400 hover:text-white transition-colors"
               >
                 <X size={18} />
               </button>
@@ -567,13 +598,13 @@ export function SendPackage() {
           ) : (
             <div className="relative">
               <div className="relative">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-600" size={18} />
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={17} />
                 <input
                   type="text"
                   placeholder="Search by name or email..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl py-3 pl-11 pr-4 text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-600 transition-all text-[15px]"
+                  className="w-full bg-slate-900/60 border border-indigo-950/70 rounded-xl py-3 pl-11 pr-4 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500/50 transition-all text-[15px]"
                 />
               </div>
               
@@ -583,10 +614,10 @@ export function SendPackage() {
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -10 }}
-                    className="absolute top-full left-0 right-0 mt-2 bg-zinc-900 border border-zinc-700 rounded-xl shadow-xl overflow-hidden z-40 max-h-60 overflow-y-auto"
+                    className="absolute top-full left-0 right-0 mt-2 card-navy-glass border border-indigo-900/50 rounded-2xl shadow-2xl overflow-hidden z-40 max-h-60 overflow-y-auto"
                   >
                     {isSearching ? (
-                      <div className="p-4 text-center text-zinc-500 text-sm">Searching...</div>
+                      <div className="p-4 text-center text-slate-400 text-sm">Searching...</div>
                     ) : searchResults.length > 0 ? (
                       <ul>
                         {searchResults.map(user => (
@@ -596,16 +627,16 @@ export function SendPackage() {
                                 setSelectedReceiver(user);
                                 setSearchQuery('');
                               }}
-                              className="w-full text-left p-4 hover:bg-zinc-800 transition-colors border-b border-zinc-800 last:border-0"
+                              className="w-full text-left p-4 hover:bg-indigo-950/40 transition-colors border-b border-indigo-950/50 last:border-0"
                             >
-                              <p className="font-medium text-zinc-200">{user.name || user.email}</p>
-                              {user.name && <p className="text-sm text-zinc-500">{user.email}</p>}
+                              <p className="font-semibold text-slate-100">{user.name || user.email}</p>
+                              {user.name && <p className="text-xs text-blue-300/60">{user.email}</p>}
                             </button>
                           </li>
                         ))}
                       </ul>
                     ) : (
-                      <div className="p-4 text-center text-zinc-500 text-sm">No users found</div>
+                      <div className="p-4 text-center text-slate-400 text-sm">No users found</div>
                     )}
                   </motion.div>
                 )}
@@ -646,23 +677,23 @@ export function SendPackage() {
 
         {/* Package Details */}
         <motion.section custom={3} initial="hidden" animate="visible" variants={staggerVariants} className="flex flex-col gap-3">
-          <h3 className="text-lg font-semibold tracking-tight">Package Details</h3>
+          <h3 className="text-base font-semibold tracking-tight text-slate-200">Package Details</h3>
           <div>
             <textarea
               rows={3}
               placeholder="What are you sending? (optional)"
               value={packageDetails}
               onChange={(e) => setPackageDetails(e.target.value)}
-              className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-4 text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-600 transition-all resize-none text-[15px]"
+              className="w-full bg-slate-900/60 border border-indigo-950/70 rounded-2xl p-4 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500/50 transition-all resize-none text-[15px]"
             />
-            <p className="text-[11px] text-zinc-700 mt-2 ml-1">e.g. Lab samples, Documents, Laptop charger</p>
+            <p className="text-[11px] text-blue-300/50 mt-2 ml-1">e.g. Lab samples, Documents, Laptop charger</p>
           </div>
         </motion.section>
 
       </main>
 
       {/* Swipe to Confirm Footer */}
-      <div className="fixed bottom-0 left-0 right-0 max-w-md mx-auto p-4 bg-zinc-950/95 backdrop-blur-xl pt-6 z-50 border-t border-zinc-800/30">
+      <div className="fixed bottom-0 left-0 right-0 max-w-md mx-auto p-4 bg-[#050814]/90 backdrop-blur-xl pt-6 z-50 border-t border-indigo-950/40">
         <SwipeToConfirm 
           onConfirm={handleConfirmDispatch} 
           disabled={!canSubmit}
@@ -670,7 +701,7 @@ export function SendPackage() {
           confirmedText="Dispatched!"
         />
         {!canSubmit && (
-          <p className="text-center text-[11px] text-zinc-600 mt-2">{getMissingText()}</p>
+          <p className="text-center text-[11px] text-slate-500 mt-2">{getMissingText()}</p>
         )}
       </div>
     </div>

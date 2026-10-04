@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-
+import { useGSAP } from '@gsap/react';
+import gsap from 'gsap';
 import { ArrowLeft, User, MapPin, LogOut, Loader2, Save, Trash2, Box } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { toast } from 'react-hot-toast';
@@ -21,6 +22,10 @@ interface SavedLocation {
 
 export function Profile() {
   const navigate = useNavigate();
+  const containerRef = useRef<HTMLDivElement>(null);
+  const orb1Ref = useRef<HTMLDivElement>(null);
+  const orb2Ref = useRef<HTMLDivElement>(null);
+
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [savedLocations, setSavedLocations] = useState<SavedLocation[]>([]);
@@ -28,6 +33,33 @@ export function Profile() {
   // Edit state
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState('');
+
+  useGSAP(() => {
+    if (orb1Ref.current) {
+      gsap.to(orb1Ref.current, {
+        x: '+=20',
+        y: '+=15',
+        scale: 1.1,
+        opacity: 0.5,
+        duration: 9,
+        repeat: -1,
+        yoyo: true,
+        ease: 'sine.inOut',
+      });
+    }
+    if (orb2Ref.current) {
+      gsap.to(orb2Ref.current, {
+        x: '-=20',
+        y: '-=15',
+        scale: 1.15,
+        opacity: 0.4,
+        duration: 11,
+        repeat: -1,
+        yoyo: true,
+        ease: 'sine.inOut',
+      });
+    }
+  }, { scope: containerRef });
 
   useEffect(() => {
     fetchProfileData();
@@ -105,33 +137,43 @@ export function Profile() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center">
-        <Loader2 className="w-8 h-8 text-white animate-spin" />
+      <div className="min-h-screen bg-[#050814] flex flex-col items-center justify-center">
+        <Loader2 className="w-8 h-8 text-blue-400 animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-white flex flex-col max-w-md mx-auto w-full relative">
-      <header className="sticky top-0 z-40 bg-zinc-950/80 backdrop-blur-xl border-b border-zinc-800/50 px-5 py-4 flex items-center gap-4">
-        <button onClick={() => navigate(-1)} className="p-2 -ml-2 rounded-full hover:bg-zinc-900 transition-colors">
+    <div ref={containerRef} className="min-h-screen bg-[#050814] text-slate-100 flex flex-col max-w-md mx-auto w-full relative overflow-hidden font-sans select-none">
+      {/* GSAP Ambient Fading Gradient Orbs */}
+      <div 
+        ref={orb1Ref}
+        className="pointer-events-none absolute -top-24 -left-20 w-80 h-80 rounded-full bg-gradient-to-br from-blue-700/20 via-indigo-900/15 to-transparent blur-3xl opacity-40 z-0"
+      />
+      <div 
+        ref={orb2Ref}
+        className="pointer-events-none absolute top-1/2 -right-20 w-80 h-80 rounded-full bg-gradient-to-tl from-rose-950/25 via-red-900/15 to-transparent blur-3xl opacity-35 z-0"
+      />
+
+      <header className="sticky top-0 z-40 bg-[#050814]/80 backdrop-blur-xl border-b border-indigo-950/50 px-5 py-4 flex items-center gap-4 relative">
+        <button onClick={() => navigate(-1)} className="p-2 -ml-2 rounded-full hover:bg-indigo-950/40 text-slate-300 transition-colors">
           <ArrowLeft className="w-5 h-5" />
         </button>
-        <h1 className="text-lg font-bold tracking-tight">Your Profile</h1>
+        <h1 className="text-lg font-bold tracking-tight bg-gradient-to-r from-white via-slate-200 to-indigo-200 bg-clip-text text-transparent">
+          Your Profile
+        </h1>
       </header>
 
-      <main className="flex-1 overflow-y-auto p-5 pb-32 flex flex-col gap-8">
+      <main className="flex-1 overflow-y-auto p-5 pb-32 flex flex-col gap-8 relative z-10">
         
-        {/* Profile Card */}
-        <section className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 relative overflow-hidden">
-          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-500 to-cyan-500 opacity-50" />
-          
+        {/* Profile Card (Fusion Glass: Navy into Crimson) */}
+        <section className="card-fusion-glass rounded-2xl p-6 relative overflow-hidden">
           <div className="flex items-center gap-4 mb-6">
-            <div className="w-16 h-16 rounded-2xl bg-zinc-800 border border-zinc-700 flex items-center justify-center flex-shrink-0 shadow-lg overflow-hidden">
+            <div className="w-16 h-16 rounded-2xl bg-indigo-950/60 border border-indigo-800/40 flex items-center justify-center flex-shrink-0 shadow-lg overflow-hidden">
               {profile?.avatar_url ? (
                 <img src={profile.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
               ) : (
-                <User size={28} className="text-zinc-500" />
+                <User size={28} className="text-blue-400" />
               )}
             </div>
             <div className="flex-1 min-w-0">
@@ -140,12 +182,12 @@ export function Profile() {
                   type="text"
                   value={editName}
                   onChange={e => setEditName(e.target.value)}
-                  className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-1.5 text-white font-medium focus:outline-none focus:border-zinc-500 mb-1"
+                  className="w-full bg-slate-900/80 border border-indigo-950/70 rounded-xl px-3 py-1.5 text-white font-medium focus:outline-none focus:border-indigo-500/50 mb-1 text-sm"
                 />
               ) : (
-                <h2 className="text-xl font-bold tracking-tight truncate">{profile?.name || 'User'}</h2>
+                <h2 className="text-lg font-bold tracking-tight text-white truncate">{profile?.name || 'User'}</h2>
               )}
-              <p className="text-sm text-zinc-500 truncate">{profile?.email}</p>
+              <p className="text-xs text-blue-300/60 truncate">{profile?.email}</p>
             </div>
           </div>
 
@@ -153,13 +195,13 @@ export function Profile() {
             <div className="flex gap-2">
               <button 
                 onClick={handleSaveProfile}
-                className="flex-1 bg-white text-zinc-950 font-semibold py-2.5 rounded-xl text-sm hover:bg-zinc-200 transition-colors flex items-center justify-center gap-2"
+                className="flex-1 bg-white text-zinc-950 font-semibold py-2.5 rounded-xl text-xs hover:bg-slate-200 transition-colors flex items-center justify-center gap-2"
               >
-                <Save size={16} /> Save
+                <Save size={15} /> Save
               </button>
               <button 
                 onClick={() => { setIsEditing(false); setEditName(profile?.name || ''); }}
-                className="flex-1 bg-zinc-800 text-white font-semibold py-2.5 rounded-xl text-sm hover:bg-zinc-700 transition-colors"
+                className="flex-1 bg-slate-900/80 border border-indigo-950/70 text-slate-300 font-semibold py-2.5 rounded-xl text-xs hover:bg-indigo-950/40 transition-colors"
               >
                 Cancel
               </button>
@@ -167,7 +209,7 @@ export function Profile() {
           ) : (
             <button 
               onClick={() => setIsEditing(true)}
-              className="w-full bg-zinc-800 text-white font-semibold py-2.5 rounded-xl text-sm hover:bg-zinc-700 transition-colors"
+              className="w-full bg-slate-900/70 hover:bg-indigo-950/40 border border-indigo-900/40 text-slate-200 font-semibold py-2.5 rounded-xl text-xs transition-colors"
             >
               Edit Profile
             </button>
@@ -176,31 +218,31 @@ export function Profile() {
 
         {/* Saved Locations */}
         <section>
-          <h3 className="text-lg font-semibold tracking-tight mb-4 flex items-center gap-2">
-            <MapPin size={18} className="text-zinc-400" /> Saved Locations
+          <h3 className="text-base font-semibold tracking-tight text-slate-200 mb-4 flex items-center gap-2">
+            <MapPin size={17} className="text-blue-400" /> Saved Locations
           </h3>
           
           {savedLocations.length === 0 ? (
-            <div className="bg-zinc-900 border border-zinc-800 border-dashed rounded-2xl p-8 flex flex-col items-center justify-center text-center">
-              <div className="w-12 h-12 rounded-full bg-zinc-800 flex items-center justify-center mb-3">
-                <MapPin size={24} className="text-zinc-500" />
+            <div className="card-navy-glass border border-indigo-950/60 border-dashed rounded-2xl p-8 flex flex-col items-center justify-center text-center">
+              <div className="w-12 h-12 rounded-full bg-indigo-950/60 border border-indigo-900/40 flex items-center justify-center mb-3">
+                <MapPin size={22} className="text-blue-400" />
               </div>
-              <p className="font-medium text-white">No saved locations</p>
-              <p className="text-sm text-zinc-500 mt-1">Save locations while sending or fetching packages for quick access.</p>
+              <p className="font-semibold text-slate-200 text-sm">No saved locations</p>
+              <p className="text-xs text-slate-500 mt-1 max-w-xs">Save locations while sending or fetching packages for quick one-tap access.</p>
             </div>
           ) : (
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-2.5">
               {savedLocations.map((loc) => (
-                <div key={loc.id} className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 flex items-center justify-between">
+                <div key={loc.id} className="card-navy-glass border border-indigo-900/35 rounded-2xl p-4 flex items-center justify-between">
                   <div>
-                    <p className="font-medium text-white">{loc.label}</p>
-                    <p className="text-xs text-zinc-500 font-mono mt-1">{loc.lat.toFixed(5)}, {loc.lng.toFixed(5)}</p>
+                    <p className="font-semibold text-white text-sm">{loc.label}</p>
+                    <p className="text-[11px] text-blue-300/50 font-mono mt-1">{loc.lat.toFixed(5)}, {loc.lng.toFixed(5)}</p>
                   </div>
                   <button 
                     onClick={() => handleDeleteLocation(loc.id)}
-                    className="p-2 rounded-lg bg-zinc-800 text-zinc-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                    className="p-2 rounded-xl bg-slate-900/60 border border-indigo-950/60 text-slate-400 hover:text-rose-400 hover:bg-rose-950/30 transition-colors"
                   >
-                    <Trash2 size={18} />
+                    <Trash2 size={16} />
                   </button>
                 </div>
               ))}
@@ -210,28 +252,28 @@ export function Profile() {
         
         {/* Quick Links */}
         <section>
-          <h3 className="text-lg font-semibold tracking-tight mb-4">Account</h3>
-          <div className="flex flex-col gap-2">
+          <h3 className="text-base font-semibold tracking-tight text-slate-200 mb-4">Account</h3>
+          <div className="flex flex-col gap-2.5">
             <button 
               onClick={() => navigate('/orders')}
-              className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 flex items-center justify-between hover:bg-zinc-800 transition-colors text-left"
+              className="card-navy-glass border border-indigo-900/35 hover:border-indigo-700/50 rounded-2xl p-4 flex items-center justify-between transition-all text-left"
             >
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-zinc-800 flex items-center justify-center">
-                  <Box size={20} className="text-white" />
+                <div className="w-10 h-10 rounded-xl bg-indigo-950/60 border border-indigo-800/40 flex items-center justify-center text-blue-400">
+                  <Box size={18} />
                 </div>
                 <div>
-                  <p className="font-medium text-white">Delivery History</p>
-                  <p className="text-xs text-zinc-500 mt-0.5">View your past dispatches</p>
+                  <p className="font-semibold text-white text-sm">Delivery History</p>
+                  <p className="text-xs text-blue-300/50 mt-0.5">View your past campus dispatches</p>
                 </div>
               </div>
             </button>
             
             <button 
               onClick={handleSignOut}
-              className="mt-4 w-full bg-red-500/10 text-red-500 font-semibold py-3.5 rounded-xl flex items-center justify-center gap-2 hover:bg-red-500/20 transition-colors"
+              className="mt-4 w-full bg-rose-950/30 text-rose-400 border border-rose-900/40 hover:bg-rose-950/50 font-semibold py-3.5 rounded-2xl flex items-center justify-center gap-2 transition-colors text-sm"
             >
-              <LogOut size={18} /> Sign Out
+              <LogOut size={16} /> Sign Out
             </button>
           </div>
         </section>

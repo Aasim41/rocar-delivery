@@ -5,6 +5,8 @@ import {
   Timer, Zap, Play, Lock, Unlock, Check, ShieldCheck, ChevronRight
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useGSAP } from '@gsap/react';
+import gsap from 'gsap';
 import { supabase } from '../lib/supabase';
 import { connectToCartWS, startDelivery, getBackendUrl, setBackendUrl, verifyQR, dispatchCart, completeRetrieval, type CartUpdate } from '../lib/backendApi';
 import { sendLocalNotification } from '../lib/notifications';
@@ -57,6 +59,37 @@ function interpolatePoints(
 export function OrderTracking() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  const orb1Ref = useRef<HTMLDivElement>(null);
+  const orb2Ref = useRef<HTMLDivElement>(null);
+
+  useGSAP(() => {
+    if (orb1Ref.current) {
+      gsap.to(orb1Ref.current, {
+        x: '+=20',
+        y: '+=15',
+        scale: 1.1,
+        opacity: 0.5,
+        duration: 8,
+        repeat: -1,
+        yoyo: true,
+        ease: 'sine.inOut',
+      });
+    }
+    if (orb2Ref.current) {
+      gsap.to(orb2Ref.current, {
+        x: '-=20',
+        y: '-=15',
+        scale: 1.15,
+        opacity: 0.4,
+        duration: 10,
+        repeat: -1,
+        yoyo: true,
+        ease: 'sine.inOut',
+      });
+    }
+  }, { scope: containerRef });
 
   const [delivery, setDelivery] = useState<any>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -507,45 +540,55 @@ export function OrderTracking() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-white flex flex-col max-w-md mx-auto w-full pb-10">
+    <div ref={containerRef} className="min-h-screen bg-[#050814] text-slate-100 flex flex-col max-w-md mx-auto w-full pb-10 relative overflow-hidden font-sans">
+      {/* GSAP Ambient Floating Orbs */}
+      <div 
+        ref={orb1Ref}
+        className="pointer-events-none absolute -top-24 -left-20 w-80 h-80 rounded-full bg-gradient-to-br from-blue-700/20 via-indigo-900/15 to-transparent blur-3xl opacity-40 z-0"
+      />
+      <div 
+        ref={orb2Ref}
+        className="pointer-events-none absolute top-1/2 -right-24 w-80 h-80 rounded-full bg-gradient-to-tl from-rose-950/25 via-red-900/10 to-transparent blur-3xl opacity-35 z-0"
+      />
+
       {/* Header */}
-      <header className="sticky top-0 z-40 bg-zinc-950/80 backdrop-blur-xl border-b border-zinc-800/50 px-5 py-3 flex items-center justify-between">
+      <header className="sticky top-0 z-40 bg-[#050814]/80 backdrop-blur-xl border-b border-indigo-950/50 px-5 py-3 flex items-center justify-between relative">
         <div className="flex items-center gap-3">
-          <button onClick={() => navigate('/')} className="p-2 -ml-2 rounded-full hover:bg-zinc-900 transition-colors">
+          <button onClick={() => navigate('/')} className="p-2 -ml-2 rounded-full hover:bg-indigo-950/40 text-slate-300 transition-colors">
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div>
-            <h1 className="text-base font-bold tracking-tight">Live Tracking</h1>
-            <p className="text-[11px] text-zinc-500 font-mono">{id?.slice(0, 8)}...</p>
+            <h1 className="text-base font-bold tracking-tight bg-gradient-to-r from-white via-slate-200 to-indigo-200 bg-clip-text text-transparent">Live Tracking</h1>
+            <p className="text-[11px] text-blue-300/50 font-mono">{id?.slice(0, 8)}...</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
           <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wider ${
-            wsConnected ? 'bg-emerald-500/10 text-emerald-400' : simRunning ? 'bg-amber-500/10 text-amber-400' : 'bg-zinc-800 text-zinc-500'
+            wsConnected ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : simRunning ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'bg-slate-900/80 text-slate-500 border border-slate-800'
           }`}>
             <span className={`w-1.5 h-1.5 rounded-full ${
-              wsConnected ? 'bg-emerald-400 animate-pulse' : simRunning ? 'bg-amber-400 animate-pulse' : 'bg-zinc-600'
+              wsConnected ? 'bg-emerald-400 animate-pulse shadow-[0_0_8px_#10b981]' : simRunning ? 'bg-amber-400 animate-pulse shadow-[0_0_8px_#f59e0b]' : 'bg-slate-600'
             }`} />
             {wsConnected ? 'Live' : simRunning ? 'Demo' : 'Offline'}
           </div>
-          <button onClick={() => setShowConfig(!showConfig)} className="p-2 rounded-full hover:bg-zinc-900 text-zinc-500 text-xs">⚙</button>
+          <button onClick={() => setShowConfig(!showConfig)} className="p-2 rounded-full hover:bg-indigo-950/40 text-slate-400 text-xs">⚙</button>
         </div>
       </header>
 
       {/* Backend URL Config Modal */}
       <AnimatePresence>
         {showConfig && (
-          <motion.div initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }} className="overflow-hidden border-b border-zinc-800 bg-zinc-900/50">
+          <motion.div initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }} className="overflow-hidden border-b border-indigo-950/60 bg-slate-950/80 backdrop-blur-md">
             <div className="px-5 py-3 flex gap-2">
               <input
                 value={backendInput}
                 onChange={(e) => setBackendInput(e.target.value)}
                 placeholder="http://192.168.20.20:8000"
-                className="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-zinc-500"
+                className="flex-1 bg-slate-900/80 border border-indigo-950/70 rounded-lg px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-indigo-500/50"
               />
               <button
                 onClick={() => { setBackendUrl(backendInput); setShowConfig(false); window.location.reload(); }}
-                className="px-4 py-2 bg-white text-zinc-900 rounded-lg text-xs font-semibold"
+                className="px-4 py-2 bg-white text-zinc-900 rounded-lg text-xs font-semibold hover:bg-slate-200 transition-colors"
               >
                 Save
               </button>
@@ -555,15 +598,15 @@ export function OrderTracking() {
       </AnimatePresence>
 
       {/* Map View */}
-      <div className="relative w-full h-[42vh] bg-zinc-900 border-b border-zinc-800">
+      <div className="relative w-full h-[42vh] bg-slate-950 border-b border-indigo-950/60">
         <div ref={mapRef} className="w-full h-full" />
         
         {/* Fallback overlay if maps API is blocked or offline */}
         {!mapsLoaded && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center bg-zinc-900/90 backdrop-blur-sm">
-            <MapPin className="text-zinc-600 mb-2 animate-bounce" size={32} />
-            <p className="text-sm font-semibold text-zinc-300">Campus Route Loaded</p>
-            <p className="text-xs text-zinc-500 mt-1 max-w-xs">
+          <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center bg-slate-950/90 backdrop-blur-sm">
+            <MapPin className="text-blue-500 mb-2 animate-bounce" size={32} />
+            <p className="text-sm font-semibold text-slate-200">Campus Route Loaded</p>
+            <p className="text-xs text-blue-300/50 mt-1 max-w-xs">
               Pickup: {Number(delivery.pickup_lat).toFixed(4)}, {Number(delivery.pickup_lng).toFixed(4)}
               <br />
               Dropoff: {Number(delivery.dropoff_lat).toFixed(4)}, {Number(delivery.dropoff_lng).toFixed(4)}
@@ -572,7 +615,7 @@ export function OrderTracking() {
         )}
 
         {/* Cargo State Pill */}
-        <div className="absolute bottom-3 left-4 bg-zinc-950/90 backdrop-blur-md border border-zinc-800 px-3 py-1.5 rounded-full flex items-center gap-2 shadow-lg">
+        <div className="absolute bottom-3 left-4 bg-slate-950/90 backdrop-blur-md border border-indigo-900/40 px-3 py-1.5 rounded-full flex items-center gap-2 shadow-lg">
           {cargoState === 'UNLOCKED' ? (
             <>
               <Unlock size={13} className="text-emerald-400" />
@@ -580,8 +623,8 @@ export function OrderTracking() {
             </>
           ) : (
             <>
-              <Lock size={13} className="text-zinc-400" />
-              <span className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Cargo Locked</span>
+              <Lock size={13} className="text-slate-400" />
+              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Cargo Locked</span>
             </>
           )}
         </div>
@@ -600,15 +643,15 @@ export function OrderTracking() {
       )}
 
       {/* Main Status Panel */}
-      <div className="flex-1 px-5 py-4 space-y-4">
+      <div className="flex-1 px-5 py-4 space-y-4 relative z-10">
         {/* Phase Card */}
         <motion.div
           key={normPhase}
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 flex items-center gap-4"
+          className="card-navy-glass border border-indigo-900/40 rounded-2xl p-4 flex items-center gap-4"
         >
-          <div className={`w-12 h-12 rounded-xl bg-zinc-800 border border-zinc-700 flex items-center justify-center ${phaseInfo.color}`}>
+          <div className={`w-12 h-12 rounded-xl bg-indigo-950/60 border border-indigo-800/40 flex items-center justify-center ${phaseInfo.color}`}>
             <PhaseIcon size={22} />
           </div>
           <div className="flex-1">
@@ -625,7 +668,7 @@ export function OrderTracking() {
                 </span>
               )}
             </div>
-            <p className="text-[12px] text-zinc-400 mt-0.5">{phaseInfo.desc}</p>
+            <p className="text-[12px] text-blue-300/60 mt-0.5">{phaseInfo.desc}</p>
           </div>
         </motion.div>
 
@@ -636,7 +679,7 @@ export function OrderTracking() {
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="p-5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex flex-col gap-3 shadow-lg"
+            className="p-5 rounded-2xl bg-gradient-to-br from-emerald-950/40 via-emerald-900/20 to-slate-900/70 border border-emerald-500/30 flex flex-col gap-3 shadow-xl backdrop-blur-xl"
           >
             <div className="flex items-center gap-3">
               <div className="p-2.5 rounded-xl bg-emerald-500/20 text-emerald-400">
@@ -644,7 +687,7 @@ export function OrderTracking() {
               </div>
               <div>
                 <h3 className="font-bold text-white text-[15px]">RoCAR is Ready for Collection</h3>
-                <p className="text-xs text-zinc-300">Tap below to open the cargo bay latch.</p>
+                <p className="text-xs text-slate-300">Tap below to open the cargo bay latch.</p>
               </div>
             </div>
 
@@ -659,11 +702,11 @@ export function OrderTracking() {
               </button>
             ) : (
               <div className="space-y-2">
-                <div className="p-3 bg-zinc-900/80 rounded-xl border border-zinc-700/80 text-center">
+                <div className="p-3 bg-slate-950/70 rounded-xl border border-emerald-900/40 text-center">
                   <p className="text-xs font-semibold text-emerald-400 flex items-center justify-center gap-1.5">
                     <Check size={16} /> Cargo Bay is Unlocked
                   </p>
-                  <p className="text-[11px] text-zinc-400 mt-0.5">Please take your package out of the compartment.</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">Please take your package out of the compartment.</p>
                 </div>
                 <button
                   onClick={handleCompleteRetrieval}
@@ -685,7 +728,7 @@ export function OrderTracking() {
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="p-5 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex flex-col gap-3 shadow-lg"
+            className="p-5 rounded-2xl bg-gradient-to-br from-amber-950/40 via-amber-900/20 to-slate-900/70 border border-amber-500/30 flex flex-col gap-3 shadow-xl backdrop-blur-xl"
           >
             <div className="flex items-center gap-3">
               <div className="p-2.5 rounded-xl bg-amber-500/20 text-amber-400">
@@ -693,7 +736,7 @@ export function OrderTracking() {
               </div>
               <div>
                 <h3 className="font-bold text-white text-[15px]">RoCAR Arrived at Pickup</h3>
-                <p className="text-xs text-zinc-300">Load package into cargo compartment.</p>
+                <p className="text-xs text-slate-300">Load package into cargo compartment.</p>
               </div>
             </div>
 
@@ -720,41 +763,41 @@ export function OrderTracking() {
 
         {/* Telemetry Stats Row */}
         <div className="grid grid-cols-3 gap-3">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-center">
+          <div className="card-navy-glass border border-indigo-900/40 rounded-2xl p-3 text-center">
             <p className="text-lg font-bold font-mono text-white">{formatETA(eta)}</p>
-            <p className="text-[10px] text-zinc-500 uppercase tracking-wider mt-1">ETA</p>
+            <p className="text-[10px] text-blue-300/60 uppercase tracking-wider mt-1">ETA</p>
           </div>
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-center">
+          <div className="card-navy-glass border border-indigo-900/40 rounded-2xl p-3 text-center">
             <p className="text-lg font-bold font-mono text-white">{(Number(speed) || 0).toFixed(1)}</p>
-            <p className="text-[10px] text-zinc-500 uppercase tracking-wider mt-1">km/h</p>
+            <p className="text-[10px] text-blue-300/60 uppercase tracking-wider mt-1">km/h</p>
           </div>
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-center">
+          <div className="card-navy-glass border border-indigo-900/40 rounded-2xl p-3 text-center">
             <p className="text-lg font-bold font-mono text-white">{isReceiver ? 'Receiver' : 'Sender'}</p>
-            <p className="text-[10px] text-zinc-500 uppercase tracking-wider mt-1">Your Role</p>
+            <p className="text-[10px] text-blue-300/60 uppercase tracking-wider mt-1">Your Role</p>
           </div>
         </div>
 
         {/* Package Details */}
         {delivery?.package_details && (
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
-            <p className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1 font-semibold">Package Details</p>
-            <p className="text-[14px] text-zinc-200">{delivery.package_details}</p>
+          <div className="card-navy-glass border border-indigo-900/40 rounded-2xl p-4">
+            <p className="text-[11px] text-blue-300/60 uppercase tracking-wider mb-1 font-semibold">Package Details</p>
+            <p className="text-[14px] text-slate-200">{delivery.package_details}</p>
           </div>
         )}
 
         {/* Completed State Banner */}
         {normPhase === 'COMPLETED' && (
-          <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-4 flex items-center justify-between">
+          <div className="bg-gradient-to-r from-emerald-950/50 to-slate-900/80 border border-emerald-500/30 rounded-2xl p-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <CheckCircle2 size={24} className="text-emerald-400" />
               <div>
                 <p className="font-bold text-white text-sm">Delivery Finished</p>
-                <p className="text-xs text-zinc-400">Package was successfully retrieved.</p>
+                <p className="text-xs text-slate-400">Package was successfully retrieved.</p>
               </div>
             </div>
             <button
               onClick={() => navigate('/')}
-              className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-zinc-800 text-white flex items-center gap-1 hover:bg-zinc-700"
+              className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-indigo-950/80 border border-indigo-800/40 text-white flex items-center gap-1 hover:bg-indigo-900/80 transition-colors"
             >
               Done <ChevronRight size={14} />
             </button>

@@ -1,10 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useGSAP } from '@gsap/react';
+import gsap from 'gsap';
 import { supabase } from '../lib/supabase';
 import { Package, Loader2 } from 'lucide-react';
 
 export function Login() {
   const navigate = useNavigate();
+  const containerRef = useRef<HTMLDivElement>(null);
+  const orb1Ref = useRef<HTMLDivElement>(null);
+  const orb2Ref = useRef<HTMLDivElement>(null);
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   
@@ -12,6 +18,33 @@ export function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
+
+  useGSAP(() => {
+    if (orb1Ref.current) {
+      gsap.to(orb1Ref.current, {
+        x: '+=30',
+        y: '+=20',
+        scale: 1.15,
+        opacity: 0.5,
+        duration: 9,
+        repeat: -1,
+        yoyo: true,
+        ease: 'sine.inOut',
+      });
+    }
+    if (orb2Ref.current) {
+      gsap.to(orb2Ref.current, {
+        x: '-=25',
+        y: '-=20',
+        scale: 1.2,
+        opacity: 0.4,
+        duration: 11,
+        repeat: -1,
+        yoyo: true,
+        ease: 'sine.inOut',
+      });
+    }
+  }, { scope: containerRef });
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -86,36 +119,44 @@ export function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center p-6 text-white relative overflow-hidden">
+    <div ref={containerRef} className="min-h-screen bg-[#050814] flex flex-col items-center justify-center p-6 text-white relative overflow-hidden font-sans select-none">
       
-      {/* Background aesthetic */}
-      <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] rounded-full bg-emerald-500/10 blur-[120px] pointer-events-none" />
-      <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] rounded-full bg-cyan-500/10 blur-[120px] pointer-events-none" />
+      {/* GSAP Ambient Fading Gradient Orbs */}
+      <div 
+        ref={orb1Ref}
+        className="pointer-events-none absolute -top-24 -left-20 w-96 h-96 rounded-full bg-gradient-to-br from-blue-700/25 via-indigo-900/15 to-transparent blur-3xl opacity-40 z-0"
+      />
+      <div 
+        ref={orb2Ref}
+        className="pointer-events-none absolute -bottom-24 -right-20 w-96 h-96 rounded-full bg-gradient-to-tl from-rose-950/30 via-red-900/15 to-transparent blur-3xl opacity-35 z-0"
+      />
 
       <div className="w-full max-w-sm z-10">
         <div className="flex flex-col items-center mb-10">
-          <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-[0_0_40px_rgba(255,255,255,0.1)] mb-6 relative">
-            <Package size={32} className="text-zinc-950 absolute" />
-            <div className="absolute inset-0 border border-white/20 rounded-2xl animate-ping opacity-20" />
+          <div className="w-16 h-16 rounded-2xl card-fusion-glass border border-indigo-700/50 flex items-center justify-center shadow-[0_0_30px_rgba(30,58,138,0.3)] mb-6 relative">
+            <Package size={30} className="text-white absolute" />
+            <div className="absolute inset-0 border border-blue-400/20 rounded-2xl animate-ping opacity-30" />
           </div>
-          <h1 className="text-3xl font-bold tracking-tight">RoCAR</h1>
-          <p className="text-zinc-500 text-sm mt-2 tracking-wide uppercase">Campus Logistics</p>
+          <h1 className="text-3xl font-black tracking-tight bg-gradient-to-r from-white via-slate-200 to-indigo-200 bg-clip-text text-transparent">
+            RoCAR
+          </h1>
+          <p className="text-blue-300/60 text-xs mt-1.5 tracking-[0.2em] font-semibold uppercase">Campus Autonomous Logistics</p>
         </div>
 
         {error && (
-          <div className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm text-center">
+          <div className="mb-6 p-4 rounded-xl bg-rose-950/40 border border-rose-900/50 text-rose-400 text-xs text-center">
             {error}
           </div>
         )}
 
-        <form onSubmit={handleEmailAuth} className="space-y-4">
+        <form onSubmit={handleEmailAuth} className="space-y-3.5">
           {isSignUp && (
             <input
               type="text"
               placeholder="Full Name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-zinc-600 transition-colors"
+              className="w-full bg-slate-900/70 border border-indigo-950/70 rounded-xl px-4 py-3.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500/50 transition-colors"
               required
             />
           )}
@@ -125,7 +166,7 @@ export function Login() {
             placeholder="Email address"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-zinc-600 transition-colors"
+            className="w-full bg-slate-900/70 border border-indigo-950/70 rounded-xl px-4 py-3.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500/50 transition-colors"
             required
           />
           
@@ -134,7 +175,7 @@ export function Login() {
             placeholder="Password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-zinc-600 transition-colors"
+            className="w-full bg-slate-900/70 border border-indigo-950/70 rounded-xl px-4 py-3.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500/50 transition-colors"
             required
             minLength={6}
           />
@@ -142,22 +183,22 @@ export function Login() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-white text-zinc-950 font-semibold py-3.5 rounded-xl flex items-center justify-center gap-2 hover:bg-zinc-200 transition-colors active:scale-[0.98] disabled:opacity-50 disabled:active:scale-100"
+            className="w-full bg-white text-zinc-950 font-bold py-3.5 rounded-xl flex items-center justify-center gap-2 hover:bg-slate-200 transition-colors active:scale-[0.98] disabled:opacity-50 disabled:active:scale-100 text-sm shadow-lg"
           >
             {loading ? <Loader2 size={18} className="animate-spin" /> : isSignUp ? 'Create Account' : 'Sign In'}
           </button>
         </form>
 
         <div className="mt-6 flex items-center gap-4">
-          <div className="h-px bg-zinc-800 flex-1" />
-          <span className="text-xs text-zinc-600 uppercase font-semibold">Or continue with</span>
-          <div className="h-px bg-zinc-800 flex-1" />
+          <div className="h-px bg-indigo-950/60 flex-1" />
+          <span className="text-[11px] text-blue-300/40 uppercase font-semibold tracking-wider">Or continue with</span>
+          <div className="h-px bg-indigo-950/60 flex-1" />
         </div>
 
         <button
           onClick={handleGoogleLogin}
           disabled={loading}
-          className="mt-6 w-full bg-zinc-900 border border-zinc-800 text-white font-semibold py-3.5 rounded-xl flex items-center justify-center gap-3 hover:bg-zinc-800 transition-colors active:scale-[0.98] disabled:opacity-50 disabled:active:scale-100"
+          className="mt-6 w-full card-navy-glass border border-indigo-900/40 text-white font-semibold py-3.5 rounded-xl flex items-center justify-center gap-3 hover:bg-indigo-950/40 transition-colors active:scale-[0.98] disabled:opacity-50 disabled:active:scale-100 text-sm"
         >
           <svg className="w-5 h-5" viewBox="0 0 24 24">
             <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
@@ -168,11 +209,11 @@ export function Login() {
           Google
         </button>
 
-        <p className="mt-8 text-center text-sm text-zinc-500">
+        <p className="mt-8 text-center text-xs text-slate-500">
           {isSignUp ? 'Already have an account?' : "Don't have an account?"}{' '}
           <button 
             onClick={() => setIsSignUp(!isSignUp)}
-            className="text-white hover:underline font-medium focus:outline-none"
+            className="text-white hover:underline font-semibold focus:outline-none ml-1"
           >
             {isSignUp ? 'Sign in' : 'Create one'}
           </button>
