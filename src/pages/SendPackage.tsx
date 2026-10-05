@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGSAP } from '@gsap/react';
 import gsap from 'gsap';
-import { ArrowLeft, Search, MapPin, Map as MapIcon, X, Navigation2 } from 'lucide-react';
+import { ArrowLeft, Search, MapPin, Map as MapIcon, X, Navigation2, User as UserIcon } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { SwipeToConfirm } from '../components/SwipeToConfirm';
 
@@ -393,12 +393,14 @@ export function SendPackage() {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [mapsLoaded, setMapsLoaded] = useState(false);
   
-  // Receiver Selection State
+  // Receiver Selection State (Permanent Input)
+  const [receiverName, setReceiverName] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const debouncedSearch = useDebounce(searchQuery, 300);
   const [searchResults, setSearchResults] = useState<User[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [selectedReceiver, setSelectedReceiver] = useState<User | null>(null);
+  const [showUserDropdown, setShowUserDropdown] = useState(false);
 
   // Locations State
   const [savedLocations, setSavedLocations] = useState<SavedLocation[]>([]);
@@ -484,6 +486,10 @@ export function SendPackage() {
     if (!canSubmit || !currentUser) return;
 
     try {
+      const finalDetails = receiverName.trim()
+        ? (packageDetails.trim() ? `To: ${receiverName.trim()} • ${packageDetails.trim()}` : `To: ${receiverName.trim()}`)
+        : (packageDetails.trim() || null);
+
       const { data: deliveryData, error: deliveryError } = await supabase
         .from('deliveries')
         .insert({
@@ -493,7 +499,7 @@ export function SendPackage() {
           pickup_lng: pickupCoords.lng,
           dropoff_lat: dropoffCoords.lat,
           dropoff_lng: dropoffCoords.lng,
-          package_details: packageDetails || null,
+          package_details: finalDetails,
           delivery_type: 'send',
           status: 'pending'
         })
@@ -572,77 +578,91 @@ export function SendPackage() {
 
       <main className="flex-1 overflow-y-auto px-5 py-6 flex flex-col gap-8 pb-32 relative z-10">
         
-        {/* Receiver Selection (optional) */}
+        {/* Receiver Name Field (Permanent) */}
         <motion.section 
           custom={0} initial="hidden" animate="visible" variants={staggerVariants}
           className="flex flex-col gap-3 relative z-30"
         >
           <div className="flex items-center justify-between">
-            <h3 className="text-base font-semibold tracking-tight text-slate-200">Receiver</h3>
-            <span className="text-[10px] text-blue-300/60 uppercase tracking-wider font-semibold">Optional</span>
+            <h3 className="text-base font-semibold tracking-tight text-slate-200 flex items-center gap-2">
+              <UserIcon size={16} className="text-blue-400" /> Receiver Name
+            </h3>
+            <span className="text-[10px] text-blue-400 font-mono uppercase tracking-wider font-semibold">
+              {receiverName.trim() ? '✓ Added' : 'Permanent'}
+            </span>
           </div>
           
-          {selectedReceiver ? (
-            <div className="flex items-center justify-between p-4 rounded-2xl card-navy-glass border border-indigo-900/40">
-              <div>
-                <p className="font-semibold text-white">{selectedReceiver.name || selectedReceiver.email}</p>
-                {selectedReceiver.name && <p className="text-xs text-blue-300/60 mt-0.5">{selectedReceiver.email}</p>}
-              </div>
-              <button 
-                onClick={() => setSelectedReceiver(null)}
-                className="p-2 rounded-full hover:bg-indigo-950/50 text-slate-400 hover:text-white transition-colors"
-              >
-                <X size={18} />
-              </button>
-            </div>
-          ) : (
+          <div className="relative">
             <div className="relative">
-              <div className="relative">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={17} />
-                <input
-                  type="text"
-                  placeholder="Search by name or email..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-slate-900/60 border border-indigo-950/70 rounded-xl py-3 pl-11 pr-4 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500/50 transition-all text-[15px]"
-                />
-              </div>
-              
-              <AnimatePresence>
-                {searchQuery.trim().length >= 2 && !selectedReceiver && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    className="absolute top-full left-0 right-0 mt-2 card-navy-glass border border-indigo-900/50 rounded-2xl shadow-2xl overflow-hidden z-40 max-h-60 overflow-y-auto"
-                  >
-                    {isSearching ? (
-                      <div className="p-4 text-center text-slate-400 text-sm">Searching...</div>
-                    ) : searchResults.length > 0 ? (
-                      <ul>
-                        {searchResults.map(user => (
-                          <li key={user.id}>
-                            <button
-                              onClick={() => {
-                                setSelectedReceiver(user);
-                                setSearchQuery('');
-                              }}
-                              className="w-full text-left p-4 hover:bg-indigo-950/40 transition-colors border-b border-indigo-950/50 last:border-0"
-                            >
-                              <p className="font-semibold text-slate-100">{user.name || user.email}</p>
-                              {user.name && <p className="text-xs text-blue-300/60">{user.email}</p>}
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <div className="p-4 text-center text-slate-400 text-sm">No users found</div>
-                    )}
-                  </motion.div>
-                )}
-              </AnimatePresence>
+              <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={17} />
+              <input
+                type="text"
+                placeholder="Enter recipient name (e.g. John Doe, Lab 3)..."
+                value={receiverName}
+                onChange={(e) => {
+                  setReceiverName(e.target.value);
+                  setSearchQuery(e.target.value);
+                  setShowUserDropdown(true);
+                }}
+                onFocus={() => {
+                  if (searchResults.length > 0) setShowUserDropdown(true);
+                }}
+                className="w-full bg-slate-900/60 border border-indigo-950/70 rounded-xl py-3.5 pl-11 pr-10 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500/50 transition-all text-[15px]"
+              />
+              {receiverName && (
+                <button 
+                  type="button"
+                  onClick={() => {
+                    setReceiverName('');
+                    setSearchQuery('');
+                    setSelectedReceiver(null);
+                    setShowUserDropdown(false);
+                  }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-white"
+                >
+                  <X size={16} />
+                </button>
+              )}
             </div>
-          )}
+
+            {/* Suggestions dropdown if matching campus users found */}
+            <AnimatePresence>
+              {showUserDropdown && searchQuery.trim().length >= 2 && (isSearching || searchResults.length > 0) && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="absolute top-full left-0 right-0 mt-2 card-navy-glass border border-indigo-900/50 rounded-2xl shadow-2xl overflow-hidden z-40 max-h-60 overflow-y-auto"
+                >
+                  <div className="p-2 text-[10px] uppercase font-semibold text-blue-300/60 px-3 tracking-wider bg-slate-950/60">
+                    Registered Campus Users (Tap to Auto-fill)
+                  </div>
+                  {isSearching ? (
+                    <div className="p-3 text-center text-slate-400 text-xs">Searching campus directory...</div>
+                  ) : (
+                    <ul>
+                      {searchResults.map(user => (
+                        <li key={user.id}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setReceiverName(user.name || user.email);
+                              setSelectedReceiver(user);
+                              setShowUserDropdown(false);
+                            }}
+                            className="w-full text-left p-3 hover:bg-indigo-950/40 transition-colors border-b border-indigo-950/50 last:border-0"
+                          >
+                            <p className="font-semibold text-slate-100 text-sm">{user.name || user.email}</p>
+                            {user.name && <p className="text-xs text-blue-300/60">{user.email}</p>}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
         </motion.section>
 
         {/* Pickup Location */}

@@ -133,7 +133,6 @@ export function sendLocalNotification(title: string, body: string, icon = '🤖'
             title,
             body,
             channelId: 'autodrop_channel',
-            schedule: { at: new Date(Date.now() + 100) },
           },
         ],
       }).catch((err) => {

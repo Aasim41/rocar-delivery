@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGSAP } from '@gsap/react';
 import gsap from 'gsap';
-import { ArrowLeft, Search, MapPin, Map as MapIcon, X, Navigation2, Box } from 'lucide-react';
+import { ArrowLeft, Search, MapPin, Map as MapIcon, X, Navigation2, Box, User as UserIcon } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { SwipeToConfirm } from '../components/SwipeToConfirm';
 
@@ -329,12 +329,14 @@ export function FetchPackage() {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [mapsLoaded, setMapsLoaded] = useState(false);
 
-  // Sender (who has the item)
+  // Sender (who has the item - permanent field)
+  const [senderName, setSenderName] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const debouncedSearch = useDebounce(searchQuery, 300);
   const [searchResults, setSearchResults] = useState<User[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [selectedSender, setSelectedSender] = useState<User | null>(null);
+  const [showUserDropdown, setShowUserDropdown] = useState(false);
 
   // Locations
   const [savedLocations, setSavedLocations] = useState<SavedLocation[]>([]);
@@ -399,6 +401,10 @@ export function FetchPackage() {
   const handleConfirm = async () => {
     if (!canSubmit || !currentUser) return;
     try {
+      const finalDetails = senderName.trim()
+        ? (itemDetails.trim() ? `From: ${senderName.trim()} • ${itemDetails.trim()}` : `From: ${senderName.trim()}`)
+        : (itemDetails.trim() || null);
+
       // In FETCH mode: current user is RECEIVER, selected person is SENDER
       const { data, error } = await supabase.from('deliveries').insert({
         sender_id: selectedSender?.id || currentUser.id,
@@ -407,7 +413,7 @@ export function FetchPackage() {
         pickup_lng: pickupCoords.lng,
         dropoff_lat: dropoffCoords.lat,
         dropoff_lng: dropoffCoords.lng,
-        package_details: itemDetails || null,
+        package_details: finalDetails,
         delivery_type: 'fetch',
         status: 'pending',
       }).select('id').single();
@@ -462,59 +468,83 @@ export function FetchPackage() {
 
       <main className="flex-1 overflow-y-auto px-5 py-6 flex flex-col gap-8 pb-32 relative z-10">
 
-        {/* Who has the item (optional) */}
+        {/* Sender Name Field (Permanent) */}
         <motion.section custom={0} initial="hidden" animate="visible" variants={staggerVariants} className="flex flex-col gap-3 relative z-30">
           <div className="flex items-center justify-between">
-            <h3 className="text-base font-semibold tracking-tight text-slate-200">Who has the item?</h3>
-            <span className="text-[10px] text-rose-300/60 uppercase tracking-wider font-semibold">Optional</span>
+            <h3 className="text-base font-semibold tracking-tight text-slate-200 flex items-center gap-2">
+              <UserIcon size={16} className="text-rose-400" /> Sender Name (Who has the item?)
+            </h3>
+            <span className="text-[10px] text-rose-400 font-mono uppercase tracking-wider font-semibold">
+              {senderName.trim() ? '✓ Added' : 'Permanent'}
+            </span>
           </div>
           
-          {selectedSender ? (
-            <div className="flex items-center justify-between p-4 rounded-2xl card-crimson-glass border border-rose-900/40">
-              <div>
-                <p className="font-semibold text-white">{selectedSender.name || selectedSender.email}</p>
-                {selectedSender.name && <p className="text-xs text-rose-300/60 mt-0.5">{selectedSender.email}</p>}
-              </div>
-              <button onClick={() => setSelectedSender(null)} className="p-2 rounded-full hover:bg-rose-950/50 text-slate-400 hover:text-white transition-colors">
-                <X size={18} />
-              </button>
-            </div>
-          ) : (
+          <div className="relative">
             <div className="relative">
-              <div className="relative">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={17} />
-                <input
-                  type="text"
-                  placeholder="Search by name or email..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-slate-900/60 border border-rose-950/70 rounded-xl py-3 pl-11 pr-4 text-white placeholder-slate-500 focus:outline-none focus:border-rose-500/50 transition-all text-[15px]"
-                />
-              </div>
-              <AnimatePresence>
-                {searchQuery.trim().length >= 2 && !selectedSender && (
-                  <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="absolute top-full left-0 right-0 mt-2 card-crimson-glass border border-rose-900/50 rounded-2xl shadow-2xl overflow-hidden z-40 max-h-60 overflow-y-auto">
-                    {isSearching ? (
-                      <div className="p-4 text-center text-slate-400 text-sm">Searching...</div>
-                    ) : searchResults.length > 0 ? (
-                      <ul>
-                        {searchResults.map(user => (
-                          <li key={user.id}>
-                            <button onClick={() => { setSelectedSender(user); setSearchQuery(''); }} className="w-full text-left p-4 hover:bg-rose-950/40 transition-colors border-b border-rose-950/50 last:border-0">
-                              <p className="font-semibold text-slate-100">{user.name || user.email}</p>
-                              {user.name && <p className="text-xs text-rose-300/60">{user.email}</p>}
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <div className="p-4 text-center text-slate-400 text-sm">No users found</div>
-                    )}
-                  </motion.div>
-                )}
-              </AnimatePresence>
+              <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={17} />
+              <input
+                type="text"
+                placeholder="Enter sender name (e.g. Maya, Lab Assistant, Library Desk)..."
+                value={senderName}
+                onChange={(e) => {
+                  setSenderName(e.target.value);
+                  setSearchQuery(e.target.value);
+                  setShowUserDropdown(true);
+                }}
+                onFocus={() => {
+                  if (searchResults.length > 0) setShowUserDropdown(true);
+                }}
+                className="w-full bg-slate-900/60 border border-rose-950/70 rounded-xl py-3.5 pl-11 pr-10 text-white placeholder-slate-500 focus:outline-none focus:border-rose-500/50 transition-all text-[15px]"
+              />
+              {senderName && (
+                <button 
+                  type="button"
+                  onClick={() => {
+                    setSenderName('');
+                    setSearchQuery('');
+                    setSelectedSender(null);
+                    setShowUserDropdown(false);
+                  }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-white"
+                >
+                  <X size={16} />
+                </button>
+              )}
             </div>
-          )}
+
+            {/* Suggestions dropdown if matching campus users found */}
+            <AnimatePresence>
+              {showUserDropdown && searchQuery.trim().length >= 2 && (isSearching || searchResults.length > 0) && (
+                <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="absolute top-full left-0 right-0 mt-2 card-crimson-glass border border-rose-900/50 rounded-2xl shadow-2xl overflow-hidden z-40 max-h-60 overflow-y-auto">
+                  <div className="p-2 text-[10px] uppercase font-semibold text-rose-300/60 px-3 tracking-wider bg-slate-950/60">
+                    Registered Campus Users (Tap to Auto-fill)
+                  </div>
+                  {isSearching ? (
+                    <div className="p-3 text-center text-slate-400 text-xs">Searching campus directory...</div>
+                  ) : (
+                    <ul>
+                      {searchResults.map(user => (
+                        <li key={user.id}>
+                          <button 
+                            type="button"
+                            onClick={() => {
+                              setSenderName(user.name || user.email);
+                              setSelectedSender(user);
+                              setShowUserDropdown(false);
+                            }} 
+                            className="w-full text-left p-3 hover:bg-rose-950/40 transition-colors border-b border-rose-950/50 last:border-0"
+                          >
+                            <p className="font-semibold text-slate-100 text-sm">{user.name || user.email}</p>
+                            {user.name && <p className="text-xs text-rose-300/60">{user.email}</p>}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
         </motion.section>
 
         {/* Pickup (where the item is) */}
