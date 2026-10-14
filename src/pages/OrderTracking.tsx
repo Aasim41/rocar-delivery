@@ -707,6 +707,35 @@ export function OrderTracking() {
           </div>
         </motion.div>
 
+        {/* Hailing Toast Notice */}
+        <AnimatePresence>
+          {hailToast && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="bg-blue-500/20 border border-blue-500/40 text-blue-200 px-4 py-2 rounded-xl text-xs flex items-center justify-center gap-2 font-medium shadow-lg backdrop-blur-md"
+            >
+              <Volume2 size={16} className="text-blue-400 animate-bounce" />
+              {hailToast}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Hail Cart / Ring Buzzer Quick Action (visible during active transit/arrival) */}
+        {normPhase !== 'COMPLETED' && normPhase !== 'PENDING' && (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleHailCart}
+              disabled={isHailing}
+              className="flex-1 bg-indigo-950/70 hover:bg-indigo-900/80 active:scale-[0.98] border border-indigo-800/50 text-indigo-200 py-2.5 px-4 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 shadow-sm transition-all"
+            >
+              <Bell size={15} className={`text-indigo-400 ${isHailing ? 'animate-spin' : ''}`} />
+              {isHailing ? 'Hailing Cart...' : 'Hail Cart (Ring Buzzer)'}
+            </button>
+          </div>
+        )}
+
         {/* ======================================================== */}
         {/* RECEIVER ACTIONS: Shown when the cart is at destination */}
         {/* ======================================================== */}
@@ -721,20 +750,30 @@ export function OrderTracking() {
                 <ShieldCheck size={24} />
               </div>
               <div>
-                <h3 className="font-bold text-white text-[15px]">AutoDrop is Ready for Collection</h3>
-                <p className="text-xs text-slate-300">Tap below to open the cargo bay latch.</p>
+                <h3 className="font-bold text-white text-[15px]">AutoDrop Arrived at Destination</h3>
+                <p className="text-xs text-slate-300">Scan cart lid QR code or tap to unlock.</p>
               </div>
             </div>
 
             {cargoState === 'LOCKED' ? (
-              <button
-                onClick={handleUnlockCargo}
-                disabled={isUnlocking}
-                className="w-full bg-emerald-500 text-zinc-950 font-bold py-3.5 rounded-xl flex items-center justify-center gap-2 text-sm shadow-md hover:bg-emerald-400 active:scale-[0.98] transition-all"
-              >
-                <Unlock size={18} />
-                {isUnlocking ? 'Unlocking Latch...' : 'Unlock Cargo Bay'}
-              </button>
+              <div className="space-y-2">
+                <button
+                  onClick={() => setIsQRScannerOpen(true)}
+                  disabled={isUnlocking}
+                  className="w-full bg-emerald-500 text-zinc-950 font-bold py-3.5 rounded-xl flex items-center justify-center gap-2 text-sm shadow-lg hover:bg-emerald-400 active:scale-[0.98] transition-all"
+                >
+                  <Camera size={18} />
+                  Scan QR Code with Camera
+                </button>
+                <button
+                  onClick={() => handleUnlockCargo('cart_01')}
+                  disabled={isUnlocking}
+                  className="w-full bg-slate-900 hover:bg-slate-800 text-slate-300 font-semibold py-2.5 rounded-xl flex items-center justify-center gap-2 text-xs border border-emerald-900/40 transition-colors"
+                >
+                  <Unlock size={14} className="text-emerald-400" />
+                  {isUnlocking ? 'Unlocking...' : '1-Tap Bypass Unlock'}
+                </button>
+              </div>
             ) : (
               <div className="space-y-2">
                 <div className="p-3 bg-slate-950/70 rounded-xl border border-emerald-900/40 text-center">
@@ -771,19 +810,29 @@ export function OrderTracking() {
               </div>
               <div>
                 <h3 className="font-bold text-white text-[15px]">AutoDrop Arrived at Pickup</h3>
-                <p className="text-xs text-slate-300">Load package into cargo compartment.</p>
+                <p className="text-xs text-slate-300">Scan cart lid QR code or tap to unlock.</p>
               </div>
             </div>
 
             {cargoState === 'LOCKED' ? (
-              <button
-                onClick={handleUnlockCargo}
-                disabled={isUnlocking}
-                className="w-full bg-amber-500 text-zinc-950 font-bold py-3.5 rounded-xl flex items-center justify-center gap-2 text-sm shadow-md hover:bg-amber-400 active:scale-[0.98] transition-all"
-              >
-                <Unlock size={18} />
-                {isUnlocking ? 'Unlocking...' : 'Unlock Cargo to Load'}
-              </button>
+              <div className="space-y-2">
+                <button
+                  onClick={() => setIsQRScannerOpen(true)}
+                  disabled={isUnlocking}
+                  className="w-full bg-amber-500 text-zinc-950 font-bold py-3.5 rounded-xl flex items-center justify-center gap-2 text-sm shadow-lg hover:bg-amber-400 active:scale-[0.98] transition-all"
+                >
+                  <Camera size={18} />
+                  Scan QR Code to Open Lid
+                </button>
+                <button
+                  onClick={() => handleUnlockCargo('cart_01')}
+                  disabled={isUnlocking}
+                  className="w-full bg-slate-900 hover:bg-slate-800 text-slate-300 font-semibold py-2.5 rounded-xl flex items-center justify-center gap-2 text-xs border border-amber-900/40 transition-colors"
+                >
+                  <Unlock size={14} className="text-amber-400" />
+                  {isUnlocking ? 'Unlocking...' : '1-Tap Bypass Unlock'}
+                </button>
+              </div>
             ) : (
               <button
                 onClick={handleDispatchCart}
@@ -839,6 +888,15 @@ export function OrderTracking() {
           </div>
         )}
       </div>
+
+      {/* Physical Camera QR Scanner Modal */}
+      <QRScannerModal
+        isOpen={isQRScannerOpen}
+        onClose={() => setIsQRScannerOpen(false)}
+        onScanSuccess={(code) => handleUnlockCargo(code)}
+        title={isReceiver ? "Scan Cart to Retrieve" : "Scan Cart to Load"}
+        subtitle="Align phone camera over the QR code sticker on the cart"
+      />
     </div>
   );
 }
