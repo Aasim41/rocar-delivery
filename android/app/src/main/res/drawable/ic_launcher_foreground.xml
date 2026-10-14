@@ -1,0 +1,59 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    
+    <!-- Outer Cyber Ring -->
+    <path
+        android:strokeColor="#1E293B"
+        android:strokeWidth="1.5"
+        android:strokeLineCap="round"
+        android:pathData="M 54,20 A 34,34 0 1,1 53.9,20" />
+
+    <!-- Hexagonal Robotic Chassis (Dark Navy Armor) -->
+    <path
+        android:fillColor="#0D1527"
+        android:strokeColor="#38BDF8"
+        android:strokeWidth="1.5"
+        android:pathData="M 54,26 L 76,38 L 76,70 L 54,82 L 32,70 L 32,38 Z" />
+
+    <!-- Crimson Delivery Pod Body -->
+    <path
+        android:fillColor="#E11D48"
+        android:pathData="M 54,32 L 71,42 L 71,66 L 54,76 L 37,66 L 37,42 Z" />
+
+    <!-- Faceted Hood (Lighting Effect) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.2"
+        android:pathData="M 54,34 L 68,43 L 54,52 L 40,43 Z" />
+    <path
+        android:fillColor="#000000"
+        android:fillAlpha="0.25"
+        android:pathData="M 40,43 L 54,52 L 54,72 L 40,64 Z" />
+
+    <!-- Central LiDAR Eye (Cyan) -->
+    <path
+        android:fillColor="#050814"
+        android:strokeColor="#38BDF8"
+        android:strokeWidth="1.5"
+        android:pathData="M 54,47 A 5,5 0 1,1 53.9,47" />
+    <path
+        android:fillColor="#38BDF8"
+        android:pathData="M 54,49 A 2.5,2.5 0 1,1 53.9,49" />
+
+    <!-- Autonomous Speed Chevrons -->
+    <path
+        android:strokeColor="#38BDF8"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M 46,86 L 54,90 L 62,86" />
+    <path
+        android:strokeColor="#F43F5E"
+        android:strokeWidth="1.5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M 49,92 L 54,95 L 59,92" />
+</vector>

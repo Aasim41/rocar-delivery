@@ -2,15 +2,110 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <link rel="icon" type="image/svg+xml" href="/autodrop-logo.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>AutoDrop</title>
+    <title>AutoDrop — Autonomous Logistics</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+      body, html {
+        margin: 0;
+        padding: 0;
+        background-color: #050814;
+        color: #f8fafc;
+        font-family: 'Outfit', sans-serif;
+        overflow-x: hidden;
+      }
+      #splash-loader {
+        position: fixed;
+        inset: 0;
+        background: radial-gradient(circle at 50% 40%, #0d1527 0%, #050814 85%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+      }
+      .pulse-ring {
+        position: absolute;
+        width: 140px;
+        height: 140px;
+        border-radius: 50%;
+        border: 2px solid rgba(244, 63, 94, 0.4);
+        animation: radarPulse 2s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+      }
+      .logo-icon-wrap {
+        position: relative;
+        width: 88px;
+        height: 88px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 24px;
+      }
+      .logo-icon-wrap img {
+        width: 80px;
+        height: 80px;
+        filter: drop-shadow(0 0 20px rgba(225, 29, 72, 0.45));
+      }
+      .splash-title {
+        font-size: 26px;
+        font-weight: 700;
+        letter-spacing: 2px;
+        background: linear-gradient(135deg, #ffffff 40%, #cbd5e1 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin: 0;
+      }
+      .splash-subtitle {
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 2.5px;
+        color: #e11d48;
+        text-transform: uppercase;
+        margin-top: 6px;
+      }
+      .splash-bar-track {
+        width: 140px;
+        height: 3px;
+        background: rgba(255, 255, 255, 0.08);
+        border-radius: 10px;
+        overflow: hidden;
+        margin-top: 32px;
+        position: relative;
+      }
+      .splash-bar-fill {
+        width: 45%;
+        height: 100%;
+        background: linear-gradient(90deg, #e11d48, #38bdf8);
+        border-radius: 10px;
+        animation: progressSlide 1.4s ease-in-out infinite;
+      }
+      @keyframes radarPulse {
+        0% { transform: scale(0.85); opacity: 0.9; }
+        100% { transform: scale(1.6); opacity: 0; }
+      }
+      @keyframes progressSlide {
+        0% { transform: translateX(-100%); }
+        100% { transform: translateX(250%); }
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div id="splash-loader">
+        <div class="logo-icon-wrap">
+          <div class="pulse-ring"></div>
+          <img src="/autodrop-logo.svg" alt="AutoDrop Logo" />
+        </div>
+        <h1 class="splash-title">AUTODROP</h1>
+        <p class="splash-subtitle">Autonomous Campus Logistics</p>
+        <div class="splash-bar-track">
+          <div class="splash-bar-fill"></div>
+        </div>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
