@@ -94,6 +94,16 @@ export async function completeRetrieval() {
   return post('/backend/complete_retrieval', {});
 }
 
+/** Sound the onboard piezo buzzer to locate or hail cart */
+export async function beepCart() {
+  return post('/backend/beep', {});
+}
+
+/** Return the cart immediately to charging dock / base */
+export async function returnToBase() {
+  return post('/backend/return_to_base', {});
+}
+
 /** Set charging station coordinates */
 export async function setChargingStation(lat: number, lng: number) {
   return post('/backend/set_charging_station', { lat, lng });
