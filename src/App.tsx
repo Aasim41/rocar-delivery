@@ -66,31 +66,41 @@ function AppRoutes() {
           }
         }
       }
-    }).catch(() => {});
+    });
 
     return () => subscription.unsubscribe();
   }, []);
 
   const ensureUserProfile = async (user: any) => {
     try {
-      const { data, error } = await supabase.from('users').select('id').eq('id', user.id).maybeSingle();
-      
+      const { data, error } = await supabase
+        .from('users')
+        .select('id')
+        .eq('id', user.id)
+        .maybeSingle();
+
       if (!data && !error) {
         // User doesn't exist in public.users yet, create them
-        const name = user.user_metadata?.name || user.user_metadata?.full_name || user.email?.split('@')[0] || 'User';
-        const { error: insertError } = await supabase.from('users').insert([{ 
-          id: user.id, 
-          name: name,
-          email: user.email,
-          avatar_url: user.user_metadata?.avatar_url
-        }]);
+        const name =
+          user.user_metadata?.name ||
+          user.user_metadata?.full_name ||
+          user.email?.split('@')[0] ||
+          'User';
+        const { error: insertError } = await supabase.from('users').insert([
+          {
+            id: user.id,
+            name: name,
+            email: user.email,
+            avatar_url: user.user_metadata?.avatar_url,
+          },
+        ]);
         if (insertError) {
-          console.error("Failed to insert user profile:", insertError);
-          toast.error("Error creating user profile");
+          console.error('Failed to insert user profile:', insertError);
+          toast.error('Error creating user profile');
         }
       }
     } catch (err) {
-      console.error("Error ensuring user profile:", err);
+      console.error('Error ensuring user profile:', err);
     }
   };
 
@@ -127,7 +137,7 @@ function AppRoutes() {
       <Routes location={location} key={location.pathname}>
         <Route path="/onboarding" element={<Onboarding onComplete={onOnboardingComplete} />} />
         <Route path="/login" element={<Login />} />
-        
+
         {/* Protected Routes */}
         <Route path="/" element={<Dashboard />} />
         <Route path="/send" element={<SendPackage />} />
@@ -143,9 +153,12 @@ function AppRoutes() {
 export default function App() {
   return (
     <BrowserRouter>
-      <Toaster position="top-center" toastOptions={{ 
-        style: { background: '#18181b', color: '#fff', border: '1px solid #27272a' }
-      }} />
+      <Toaster
+        position="top-center"
+        toastOptions={{
+          style: { background: '#18181b', color: '#fff', border: '1px solid #27272a' },
+        }}
+      />
       <ErrorBoundary>
         <AppRoutes />
       </ErrorBoundary>
