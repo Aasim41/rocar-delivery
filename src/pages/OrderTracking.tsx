@@ -2,14 +2,20 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft, MapPin, Package, Navigation2, Scan, CheckCircle2, 
-  Timer, Zap, Play, Lock, Unlock, Check, ShieldCheck, ChevronRight
+  Timer, Zap, Play, Lock, Unlock, Check, ShieldCheck, ChevronRight,
+  Bell, Camera, Volume2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGSAP } from '@gsap/react';
 import gsap from 'gsap';
 import { supabase } from '../lib/supabase';
-import { connectToCartWS, startDelivery, getBackendUrl, setBackendUrl, verifyQR, dispatchCart, completeRetrieval, type CartUpdate } from '../lib/backendApi';
+import { 
+  connectToCartWS, startDelivery, getBackendUrl, setBackendUrl, 
+  verifyQR, dispatchCart, completeRetrieval, beepCart, type CartUpdate 
+} from '../lib/backendApi';
 import { sendLocalNotification } from '../lib/notifications';
+import { QRScannerModal } from '../components/QRScannerModal';
+import { playArrivalChime, playUnlockChime, playHailingChirp } from '../lib/audioChimes';
 
 const GOOGLE_MAPS_API_KEY = 'AIzaSyBX0xNBFK24V2DZgMQHFku3tWcJWtVjgds';
 
@@ -107,6 +113,10 @@ export function OrderTracking() {
   // Action states for receiver and sender
   const [isUnlocking, setIsUnlocking] = useState(false);
   const [isCompleting, setIsCompleting] = useState(false);
+  const [isQRScannerOpen, setIsQRScannerOpen] = useState(false);
+  const [isHailing, setIsHailing] = useState(false);
+  const [hailToast, setHailToast] = useState<string | null>(null);
+  const hasTriggeredArrivalChime = useRef(false);
 
   // Simulation
   const [simRunning, setSimRunning] = useState(false);
@@ -218,9 +228,13 @@ export function OrderTracking() {
             const newPhase = String(payload.new.status || '').toUpperCase();
             if (newPhase) setPhase(newPhase);
 
-            // Trigger notification on milestone arrival
+            // Trigger notification and arrival chime on milestone arrival
             if (newPhase === 'AWAITING_RETRIEVAL') {
+              playArrivalChime();
               sendLocalNotification('🎉 AutoDrop Arrived!', 'Your package has arrived! Tap to unlock the cargo bay.', '📍');
+            } else if (newPhase === 'AWAITING_LOAD') {
+              playArrivalChime();
+              sendLocalNotification('📦 AutoDrop at Pickup!', 'Cart has arrived. Tap to unlock and load your package.', '📍');
             } else if (newPhase === 'DELIVERING') {
               sendLocalNotification('📦 Package on the way!', 'AutoDrop is driving to your location.', '🚀');
             }
@@ -242,6 +256,10 @@ export function OrderTracking() {
         if (data.phase) {
           const upperPhase = String(data.phase).toUpperCase();
           setPhase(upperPhase);
+          if ((upperPhase === 'AWAITING_RETRIEVAL' || upperPhase === 'AWAITING_LOAD') && !hasTriggeredArrivalChime.current) {
+            hasTriggeredArrivalChime.current = true;
+            playArrivalChime();
+          }
           if (id && upperPhase !== lastSyncedPhase.current) {
             lastSyncedPhase.current = upperPhase;
             const updates: any = { status: upperPhase };
@@ -449,19 +467,36 @@ export function OrderTracking() {
     };
   }, []);
 
-  // Receiver Action: Unlock Cargo Bay
-  const handleUnlockCargo = async () => {
+  // Receiver / Sender Action: Unlock Cargo Bay (via Camera QR Scan or Direct Tap)
+  const handleUnlockCargo = async (scannedCartId = 'cart_01') => {
     setIsUnlocking(true);
     try {
-      await verifyQR({ cartId: 'cart_01', action: isReceiver ? 'retrieve' : 'load' });
+      await verifyQR({ cartId: scannedCartId, action: isReceiver ? 'retrieve' : 'load' });
       setCargoState('UNLOCKED');
-      sendLocalNotification('🔓 Cargo Bay Unlocked', 'Latch is open. You can now retrieve your item.', '📦');
+      playUnlockChime();
+      sendLocalNotification('🔓 Cargo Bay Unlocked', 'Latch is open. You can now access the compartment.', '📦');
     } catch (err) {
       // In simulation or offline mode, simulate hardware unlock
       setCargoState('UNLOCKED');
-      sendLocalNotification('🔓 Cargo Bay Unlocked (Demo)', 'Latch is open. You can now retrieve your item.', '📦');
+      playUnlockChime();
+      sendLocalNotification('🔓 Cargo Bay Unlocked (Demo)', 'Latch is open. You can now access the compartment.', '📦');
     } finally {
       setIsUnlocking(false);
+    }
+  };
+
+  // Cart Hailing Action: Ring cart onboard buzzer + audio chirp on phone
+  const handleHailCart = async () => {
+    setIsHailing(true);
+    playHailingChirp();
+    try {
+      await beepCart();
+      setHailToast('🔔 AutoDrop buzzer sounded!');
+    } catch {
+      setHailToast('🔔 Bell hailed (chime played)!');
+    } finally {
+      setIsHailing(false);
+      setTimeout(() => setHailToast(null), 3500);
     }
   };
 
