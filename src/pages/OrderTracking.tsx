@@ -11,7 +11,7 @@ import gsap from 'gsap';
 import { supabase } from '../lib/supabase';
 import { 
   connectToCartWS, startDelivery, getBackendUrl, setBackendUrl, 
-  verifyQR, dispatchCart, completeRetrieval, beepCart, type CartUpdate 
+  verifyQR, dispatchCart, completeRetrieval, beepCart, setRoutePoints as setBackendRoutePoints, type CartUpdate 
 } from '../lib/backendApi';
 import { sendLocalNotification } from '../lib/notifications';
 import { QRScannerModal } from '../components/QRScannerModal';
@@ -355,6 +355,7 @@ export function OrderTracking() {
                   lng: p.lng(),
                 }));
                 setRoutePoints(roadPts);
+                setBackendRoutePoints(roadPts).catch(() => {});
               }
             }
           );

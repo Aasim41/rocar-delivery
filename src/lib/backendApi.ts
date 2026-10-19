@@ -65,12 +65,19 @@ export async function startDelivery(params: {
   deliveryId: string;
   pickup: { lat: number; lng: number };
   dropoff: { lat: number; lng: number };
+  routePoints?: { lat: number; lng: number }[];
 }) {
   return post('/backend/new_delivery', {
     delivery_id: params.deliveryId,
     pickup: params.pickup,
     dropoff: params.dropoff,
+    route_points: params.routePoints,
   });
+}
+
+/** Upload Google Maps walking route points directly to the robot cart */
+export async function setRoutePoints(routePoints: { lat: number; lng: number }[]) {
+  return post('/backend/set_route', { route_points: routePoints });
 }
 
 /** QR scan — unlock cart for loading or retrieval */
