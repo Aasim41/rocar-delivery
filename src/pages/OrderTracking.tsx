@@ -169,7 +169,6 @@ export function OrderTracking() {
   const pickupMarker = useRef<google.maps.Marker | null>(null);
   const dropoffMarker = useRef<google.maps.Marker | null>(null);
   const routePoly = useRef<google.maps.Polyline | null>(null);
-  const baseRoutePoly = useRef<google.maps.Polyline | null>(null);
   const [mapsLoaded, setMapsLoaded] = useState(false);
 
   const [showConfig, setShowConfig] = useState(false);
