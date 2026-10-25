@@ -123,6 +123,7 @@ export interface CartUpdate {
   cart: { lat: number; lng: number };
   source?: { lat: number; lng: number };
   destination?: { lat: number; lng: number };
+  charging_station?: { lat: number; lng: number };
   phase: string;
   cargo_state: string;
   speed: number;
