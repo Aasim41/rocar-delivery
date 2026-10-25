@@ -46,6 +46,45 @@ function formatETA(seconds: number | null): string {
   return `${Math.ceil(seconds / 60)} min`;
 }
 
+function haversineMeters(lat1: number, lon1: number, lat2: number, lon2: number) {
+  const R = 6371000;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+function denseInterpolate(
+  rawPts: { lat: number; lng: number }[],
+  maxStep = 2.5
+): { lat: number; lng: number }[] {
+  if (rawPts.length < 2) return rawPts;
+  const dense: { lat: number; lng: number }[] = [rawPts[0]];
+  for (let i = 1; i < rawPts.length; i++) {
+    const p1 = dense[dense.length - 1];
+    const p2 = rawPts[i];
+    const d = haversineMeters(p1.lat, p1.lng, p2.lat, p2.lng);
+    if (d > maxStep) {
+      const parts = Math.ceil(d / maxStep);
+      for (let k = 1; k < parts; k++) {
+        const frac = k / parts;
+        dense.push({
+          lat: Number((p1.lat + (p2.lat - p1.lat) * frac).toFixed(7)),
+          lng: Number((p1.lng + (p2.lng - p1.lng) * frac).toFixed(7)),
+        });
+      }
+    }
+    dense.push(p2);
+  }
+  return dense;
+}
+
 function interpolatePoints(
   from: { lat: number; lng: number },
   to: { lat: number; lng: number },
@@ -103,6 +142,7 @@ export function OrderTracking() {
   const [error, setError] = useState('');
 
   const [cartPos, setCartPos] = useState<{ lat: number; lng: number } | null>(null);
+  const [chargingStation, setChargingStation] = useState<{ lat: number; lng: number } | null>(null);
   const [phase, setPhase] = useState<string>('PENDING');
   const [cargoState, setCargoState] = useState<'LOCKED' | 'UNLOCKED'>('LOCKED');
   const [speed, setSpeed] = useState<number>(0);
@@ -125,9 +165,11 @@ export function OrderTracking() {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<google.maps.Map | null>(null);
   const cartMarker = useRef<google.maps.Marker | null>(null);
+  const chargingMarker = useRef<google.maps.Marker | null>(null);
   const pickupMarker = useRef<google.maps.Marker | null>(null);
   const dropoffMarker = useRef<google.maps.Marker | null>(null);
   const routePoly = useRef<google.maps.Polyline | null>(null);
+  const baseRoutePoly = useRef<google.maps.Polyline | null>(null);
   const [mapsLoaded, setMapsLoaded] = useState(false);
 
   const [showConfig, setShowConfig] = useState(false);
@@ -253,6 +295,7 @@ export function OrderTracking() {
     const cleanup = connectToCartWS(
       (data: CartUpdate) => {
         if (data.cart) setCartPos(data.cart);
+        if (data.charging_station) setChargingStation(data.charging_station);
         if (data.phase) {
           const upperPhase = String(data.phase).toUpperCase();
           setPhase(upperPhase);
