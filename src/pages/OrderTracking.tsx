@@ -348,6 +348,23 @@ export function OrderTracking() {
         gestureHandling: 'greedy',
       });
 
+      const cLat = chargingStation?.lat || (pLat - 0.0006);
+      const cLng = chargingStation?.lng || (pLng - 0.0006);
+
+      chargingMarker.current = new google.maps.Marker({
+        position: { lat: cLat, lng: cLng },
+        map: mapInstance.current,
+        title: 'Charging Station Base Dock',
+        icon: {
+          path: google.maps.SymbolPath?.CIRCLE || 0,
+          scale: 8,
+          fillColor: '#06b6d4', // Cyan
+          fillOpacity: 1,
+          strokeColor: '#083344',
+          strokeWeight: 3,
+        },
+      });
+
       pickupMarker.current = new google.maps.Marker({
         position: { lat: pLat, lng: pLng },
         map: mapInstance.current,
@@ -378,11 +395,12 @@ export function OrderTracking() {
         });
 
         const bounds = new google.maps.LatLngBounds();
+        bounds.extend({ lat: cLat, lng: cLng });
         bounds.extend({ lat: pLat, lng: pLng });
         bounds.extend({ lat: dLat, lng: dLng });
         mapInstance.current.fitBounds(bounds, 50);
 
-        // Request real pedestrian walkway road points from Google
+        // Request real pedestrian walkway road points from Google with Pinpoint Step Precision
         if (window.google?.maps?.DirectionsService) {
           const directionsService = new google.maps.DirectionsService();
           directionsService.route(
@@ -392,13 +410,34 @@ export function OrderTracking() {
               travelMode: (google.maps.TravelMode?.WALKING as any) || 'WALKING',
             },
             (result, status) => {
-              if (String(status) === 'OK' && result?.routes?.[0]?.overview_path) {
-                const roadPts = result.routes[0].overview_path.map((p) => ({
+              if (String(status) === 'OK' && result?.routes?.[0]) {
+                const rawPts: { lat: number; lng: number }[] = [];
+                const legs = result.routes[0].legs;
+                if (legs && legs.length > 0) {
+                  for (const leg of legs) {
+                    for (const step of leg.steps) {
+                      if (step.path) {
+                        for (const p of step.path) {
+                          const pt = { lat: p.lat(), lng: p.lng() };
+                          if (
+                            rawPts.length === 0 ||
+                            Math.hypot(rawPts[rawPts.length - 1].lat - pt.lat, rawPts[rawPts.length - 1].lng - pt.lng) > 1e-6
+                          ) {
+                            rawPts.push(pt);
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+                const fallback = result.routes[0].overview_path.map((p) => ({
                   lat: p.lat(),
                   lng: p.lng(),
                 }));
-                setRoutePoints(roadPts);
-                setBackendRoutePoints(roadPts).catch(() => {});
+                const baseList = rawPts.length > 0 ? rawPts : fallback;
+                const densePts = denseInterpolate(baseList, 2.5);
+                setRoutePoints(densePts);
+                setBackendRoutePoints(densePts).catch(() => {});
               }
             }
           );
@@ -440,6 +479,18 @@ export function OrderTracking() {
       console.warn('Cart marker update note:', err);
     }
   }, [cartPos]);
+
+  // Update Charging Station Marker
+  useEffect(() => {
+    try {
+      if (!mapInstance.current || !chargingStation || !window.google?.maps) return;
+      if (chargingMarker.current) {
+        chargingMarker.current.setPosition(chargingStation);
+      }
+    } catch (err) {
+      console.warn('Charging marker update note:', err);
+    }
+  }, [chargingStation]);
 
   // Draw Blue Route Polyline
   useEffect(() => {
@@ -512,18 +563,28 @@ export function OrderTracking() {
   }, []);
 
   // Receiver / Sender Action: Unlock Cargo Bay (via Camera QR Scan or Direct Tap)
-  const handleUnlockCargo = async (scannedCartId = 'cart_01') => {
+  const handleUnlockCargo = async (scannedText = 'cart_01') => {
     setIsUnlocking(true);
+    let resolvedCartId = 'cart_01';
+    const action: 'load' | 'retrieve' = isReceiver ? 'retrieve' : 'load';
+
+    if (scannedText.includes('cart_id=')) {
+      const match = scannedText.match(/cart_id=([^&]+)/);
+      if (match && match[1]) resolvedCartId = match[1];
+    } else if (!scannedText.startsWith('http')) {
+      resolvedCartId = scannedText.trim() || 'cart_01';
+    }
+
     try {
-      await verifyQR({ cartId: scannedCartId, action: isReceiver ? 'retrieve' : 'load' });
+      await verifyQR({ cartId: resolvedCartId, action });
       setCargoState('UNLOCKED');
       playUnlockChime();
-      sendLocalNotification('🔓 Cargo Bay Unlocked', 'Latch is open. You can now access the compartment.', '📦');
+      sendLocalNotification('🔓 Cargo Bay Unlocked', 'Latch is open (90°). You can now access the compartment.', '📦');
     } catch (err) {
       // In simulation or offline mode, simulate hardware unlock
       setCargoState('UNLOCKED');
       playUnlockChime();
-      sendLocalNotification('🔓 Cargo Bay Unlocked (Demo)', 'Latch is open. You can now access the compartment.', '📦');
+      sendLocalNotification('🔓 Cargo Bay Unlocked (Demo)', 'Latch is open (90°). You can now access the compartment.', '📦');
     } finally {
       setIsUnlocking(false);
     }
@@ -544,28 +605,28 @@ export function OrderTracking() {
     }
   };
 
-  // Receiver Action: Confirm Retrieval Complete
+  // Receiver Action: Confirm Retrieval Complete -> Initiates autonomous return to base dock
   const handleCompleteRetrieval = async () => {
     setIsCompleting(true);
     try {
       await completeRetrieval();
       await supabase.from('deliveries').update({
-        status: 'completed',
+        status: 'RETURNING_TO_BASE',
         completed_at: new Date().toISOString(),
       }).eq('id', id);
 
-      setPhase('COMPLETED');
+      setPhase('RETURNING_TO_BASE');
       setCargoState('LOCKED');
-      sendLocalNotification('✅ Delivery Complete!', 'Thank you for using AutoDrop Autonomous Logistics.', '🎉');
+      sendLocalNotification('🏠 Return to Base Initiated', 'Package retrieved! AutoDrop is autonomously returning to the charging dock.', '⚡');
     } catch (err) {
       // Offline fallback
       await supabase.from('deliveries').update({
-        status: 'completed',
+        status: 'RETURNING_TO_BASE',
         completed_at: new Date().toISOString(),
       }).eq('id', id);
-      setPhase('COMPLETED');
+      setPhase('RETURNING_TO_BASE');
       setCargoState('LOCKED');
-      sendLocalNotification('✅ Delivery Complete! (Demo)', 'Thank you for using AutoDrop Autonomous Logistics.', '🎉');
+      sendLocalNotification('🏠 Return to Base Initiated', 'Package retrieved! AutoDrop is autonomously returning to the charging dock.', '⚡');
     } finally {
       setIsCompleting(false);
     }
